@@ -1,10 +1,10 @@
 /**
- * 减重记账本主页：上部两列，左列三张今日卡与体重 + 摄入趋势，右列一句话记录、今天流水与 AI（AI 卡拉伸到与左列等高）；
- * 下部通栏是打卡格与四组对比。宽度不足时右列落到左列下方。参数 weigh: "am" | "pm" 打开称重弹窗（首页卡片跳转用）。
+ * 减重记账本主页：整页一张纸，标题固定在纸顶、内容在纸内滚动，纸内卡片用细描边。
+ * 上部两列，左列三张今日卡与体重 + 摄入趋势，右列一句话记录、今天流水与 AI（AI 卡拉伸到与左列等高）；下部通栏是打卡格与四组对比。宽度不足时右列落到左列下方。参数 weigh: "am" | "pm" 打开称重弹窗（首页卡片跳转用）。
  */
 import { useEffect, useMemo, useRef, useState } from "react";
 import type { PluginPageProps } from "@tau/plugins";
-import { Loading, Segmented } from "@tau/ui";
+import { FadeScroll, Loading, Segmented } from "@tau/ui";
 import { addDays, type WeighSlot } from "../data/model";
 import { useRuntime } from "../runtime";
 import { AIPanel } from "./AIPanel";
@@ -66,76 +66,85 @@ export function WeightPage({ params }: PluginPageProps) {
   const stamp = `${todayEntries.map(e => `${e.id}:${e.kcal}`).join(",")}|${t.am}|${t.pm}`;
 
   return (
-    <div className="wt:@container wt:h-full wt:overflow-y-auto wt:px-1 wt:pt-0.5 wt:pb-6">
-      <div className="wt:grid wt:grid-cols-1 wt:gap-3.5 wt:@[1040px]:grid-cols-[minmax(0,1fr)_340px]">
-        <div className="wt:flex wt:min-w-0 wt:flex-col wt:gap-3.5">
-          <div className="wt:grid wt:grid-cols-1 wt:gap-3.5 wt:@[640px]:grid-cols-[1.1fr_1.25fr_1fr]">
-            <WeightCard o={o} onWeigh={openWeigh} />
-            <BudgetCard o={o} hasProfile={profile != null} onFocusLog={focusLog} onSetup={() => void pages.settings?.open()} />
-            <MoveCard o={o} moveGoal={moveGoal} />
+    <div className="wt:mx-auto wt:flex wt:h-full wt:min-h-0 wt:w-full wt:max-w-[1720px] wt:flex-col wt:px-4 wt:pb-4 wt:pt-1">
+      <div className="wt:bg-surface wt:shadow-card wt:rounded-tau-lg wt:flex wt:min-h-0 wt:flex-1 wt:flex-col wt:overflow-hidden">
+        <header className="wt:flex-none wt:px-8 wt:pt-5">
+          <h1 className="wt:text-tau-title-lg wt:flex wt:h-10 wt:items-center wt:font-semibold wt:tracking-[-0.01em]">减重</h1>
+        </header>
+        <FadeScroll className="wt:mb-4 wt:min-h-0 wt:flex-1 wt:pb-4 wt:pl-8 wt:pr-[26px] wt:pt-3">
+          <div className="wt:@container">
+            <div className="wt:grid wt:grid-cols-1 wt:gap-3.5 wt:@[1040px]:grid-cols-[minmax(0,1fr)_340px]">
+              <div className="wt:flex wt:min-w-0 wt:flex-col wt:gap-3.5">
+                <div className="wt:grid wt:grid-cols-1 wt:gap-3.5 wt:@[640px]:grid-cols-[1.1fr_1.25fr_1fr]">
+                  <WeightCard o={o} onWeigh={openWeigh} />
+                  <BudgetCard o={o} hasProfile={profile != null} onFocusLog={focusLog} onSetup={() => void pages.settings?.open()} />
+                  <MoveCard o={o} moveGoal={moveGoal} />
+                </div>
+
+                <Card className="wt:pb-3.5">
+                  <CardHead title="体重" note="点 = 晨重，线 = 7 日均值">
+                    <Segmented<Range> label="时间范围" size="sm" value={range} onValueChange={setRange}>
+                      <Segmented.Item value="14" label="2 周" />
+                      <Segmented.Item value="30" label="月" />
+                      <Segmented.Item value="90" label="3 月" />
+                    </Segmented>
+                    <Segmented<"am" | "all"> label="显示睡前体重" size="sm" value={showPm ? "all" : "am"} onValueChange={v => setShowPm(v === "all")}>
+                      <Segmented.Item value="am" label="晨重" />
+                      <Segmented.Item value="all" label="+ 睡前" />
+                    </Segmented>
+                  </CardHead>
+                  <div className="wt:px-1 wt:pt-2.5 wt:pr-3.5">
+                    {ledger.days.some(d => d.am != null) || ledger.days.some(d => d.foodCount) ? (
+                      <TrendChart days={chartDays} today={today} goal={profile?.goalKg ?? null} showPm={showPm} />
+                    ) : (
+                      <p className="wt:text-ink-3 wt:grid wt:h-[200px] wt:place-items-center wt:text-[12.5px]">
+                        明早起床称一次，趋势从这里开始
+                      </p>
+                    )}
+                  </div>
+                  <Legend goal={profile?.goalKg != null} />
+                </Card>
+
+              </div>
+
+              <div className="wt:flex wt:min-w-0 wt:flex-col wt:gap-3.5">
+                <Card className="wt:px-4 wt:pt-3.5 wt:pb-3">
+                  <div className="wt:text-ink-3 wt:mb-2.5 wt:flex wt:items-center wt:text-[12px]">
+                    一句话记录
+                    <span className="wt:flex-1" />
+                    {dayLabel(today)} {time}
+                  </div>
+                  <div ref={logRef}>
+                    <QuickLog
+                      today={today}
+                      time={time}
+                      remaining={t.budget > 0 ? t.remaining : null}
+                      kg={o.latestAvg}
+                      hasProfile={profile != null}
+                      examples={EXAMPLES}
+                    />
+                  </div>
+                </Card>
+                <TodayList
+                  entries={todayEntries}
+                  time={time}
+                  remaining={t.budget > 0 ? t.remaining : null}
+                  moveMinutes={t.moveMinutes}
+                  moveGoal={moveGoal}
+                />
+                <AIPanel
+                  className="wt:flex-1"
+                  stamp={stamp}
+                  input={{ now: time, profile, overview: o, days: ledger.days, todayEntries }}
+                />
+              </div>
+            </div>
+            <div className="wt:mt-3.5 wt:grid wt:grid-cols-1 wt:gap-3.5 wt:@[760px]:grid-cols-2">
+              <HabitGrid ledger={ledger} today={today} budgetKnown={profile != null} moveGoal={moveGoal} />
+              <GroupCompare days={ledger.days} />
+            </div>
           </div>
-
-          <Card className="wt:pb-3.5">
-            <CardHead title="体重" note="点 = 晨重，线 = 7 日均值">
-              <Segmented<Range> label="时间范围" size="sm" value={range} onValueChange={setRange}>
-                <Segmented.Item value="14" label="2 周" />
-                <Segmented.Item value="30" label="月" />
-                <Segmented.Item value="90" label="3 月" />
-              </Segmented>
-              <Segmented<"am" | "all"> label="显示睡前体重" size="sm" value={showPm ? "all" : "am"} onValueChange={v => setShowPm(v === "all")}>
-                <Segmented.Item value="am" label="晨重" />
-                <Segmented.Item value="all" label="+ 睡前" />
-              </Segmented>
-            </CardHead>
-            <div className="wt:px-1 wt:pt-2.5 wt:pr-3.5">
-              {ledger.days.some(d => d.am != null) || ledger.days.some(d => d.foodCount) ? (
-                <TrendChart days={chartDays} today={today} goal={profile?.goalKg ?? null} showPm={showPm} />
-              ) : (
-                <p className="wt:text-ink-3 wt:grid wt:h-[200px] wt:place-items-center wt:text-[12.5px]">
-                  明早起床称一次，趋势从这里开始
-                </p>
-              )}
-            </div>
-            <Legend goal={profile?.goalKg != null} />
-          </Card>
-
-        </div>
-
-        <div className="wt:flex wt:min-w-0 wt:flex-col wt:gap-3.5">
-          <Card className="wt:px-4 wt:pt-3.5 wt:pb-3">
-            <div className="wt:text-ink-3 wt:mb-2.5 wt:flex wt:items-center wt:text-[12px]">
-              一句话记录
-              <span className="wt:flex-1" />
-              {dayLabel(today)} {time}
-            </div>
-            <div ref={logRef}>
-              <QuickLog
-                today={today}
-                time={time}
-                remaining={t.budget > 0 ? t.remaining : null}
-                kg={o.latestAvg}
-                hasProfile={profile != null}
-                examples={EXAMPLES}
-              />
-            </div>
-          </Card>
-          <TodayList
-            entries={todayEntries}
-            time={time}
-            remaining={t.budget > 0 ? t.remaining : null}
-            moveMinutes={t.moveMinutes}
-            moveGoal={moveGoal}
-          />
-          <AIPanel
-            className="wt:flex-1"
-            stamp={stamp}
-            input={{ now: time, profile, overview: o, days: ledger.days, todayEntries }}
-          />
-        </div>
-      </div>
-      <div className="wt:mt-3.5 wt:grid wt:grid-cols-1 wt:gap-3.5 wt:@[760px]:grid-cols-2">
-        <HabitGrid ledger={ledger} today={today} budgetKnown={profile != null} moveGoal={moveGoal} />
-        <GroupCompare days={ledger.days} />
+        </FadeScroll>
       </div>
       <WeighDialog
         state={weigh}

@@ -45,9 +45,10 @@ export function Delta({
   );
 }
 
+/** 纸内卡片：落在页面那张大纸上，用细描边不叠阴影 */
 export function Card({ className, children }: { className?: string; children: ReactNode }) {
   return (
-    <section className={cn("wt:bg-surface wt:shadow-card wt:rounded-tau-lg wt:min-w-0", className)}>
+    <section className={cn("wt:bg-surface wt:border wt:border-line-1 wt:rounded-tau-lg wt:min-w-0", className)}>
       {children}
     </section>
   );
