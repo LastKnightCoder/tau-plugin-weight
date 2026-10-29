@@ -2,7 +2,6 @@
  * 首页「减重」卡：今天晨重（没称时给称重入口）、还能吃多少 kcal、运动进度，下面是一句话记录。
  */
 import type { ReactNode } from "react";
-import { ChevronRight } from "lucide-react";
 import { cn } from "@tau/ui";
 import { useRuntime } from "../runtime";
 import { Delta, MOVE_COLOR, kg } from "./bits";
@@ -66,14 +65,6 @@ export function HomePanel() {
         kg={o.latestAvg}
         hasProfile={profile != null}
       />
-      <button
-        type="button"
-        onClick={() => void pages.main?.open()}
-        className="wt:text-ink-3 wt:hover:text-ink-1 wt:-my-0.5 wt:inline-flex wt:items-center wt:gap-0.5 wt:self-start wt:py-0.5 wt:text-[12px]"
-      >
-        查看趋势
-        <ChevronRight className="wt:size-[13px]" strokeWidth={1.75} />
-      </button>
     </div>
   );
 }

@@ -47,6 +47,6 @@ export function RuntimeProvider({ runtime, children }: { runtime: WeightRuntime;
 
 export function useRuntime(): WeightRuntime {
   const runtime = useContext(RuntimeContext);
-  if (!runtime) throw new Error("减重记账本的组件需要在插件页面内使用");
+  if (!runtime) throw new Error("减重的组件需要在插件页面内使用");
   return runtime;
 }

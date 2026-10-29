@@ -45,6 +45,7 @@ export default definePlugin({
         id: "today",
         title: "减重",
         size: "compact",
+        action: { title: "查看趋势", run: () => page.open() },
         component: () => (
           <RuntimeProvider runtime={runtime}>
             <HomePanel />

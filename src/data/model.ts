@@ -1,5 +1,5 @@
 /**
- * 减重记账本的数据形状与校验。日期一律用本地日期键 YYYY-MM-DD，时间用 HH:MM。
+ * 减重的数据形状与校验。日期一律用本地日期键 YYYY-MM-DD，时间用 HH:MM。
  * 记录与存储里读到的数据可能来自旧版本或其他设备，读取后先经 parse* 校验，不合格的丢弃。
  */
 import type { JsonValue, PluginRecord } from "@tau/plugins";
