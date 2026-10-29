@@ -1,6 +1,6 @@
 /**
- * 减重记账本主页：左列三张今日卡、体重 + 摄入趋势、打卡格与四组对比；右列一句话记录、今天流水、AI。
- * 宽度不足时右列落到下方。参数 weigh: "am" | "pm" 打开称重弹窗（首页卡片跳转用）。
+ * 减重记账本主页：上部两列，左列三张今日卡与体重 + 摄入趋势，右列一句话记录、今天流水与 AI（AI 卡拉伸到与左列等高）；
+ * 下部通栏是打卡格与四组对比。宽度不足时右列落到左列下方。参数 weigh: "am" | "pm" 打开称重弹窗（首页卡片跳转用）。
  */
 import { useEffect, useMemo, useRef, useState } from "react";
 import type { PluginPageProps } from "@tau/plugins";
@@ -67,7 +67,7 @@ export function WeightPage({ params }: PluginPageProps) {
 
   return (
     <div className="wt:@container wt:h-full wt:overflow-y-auto wt:px-1 wt:pt-0.5 wt:pb-6">
-      <div className="wt:grid wt:grid-cols-1 wt:items-start wt:gap-3.5 wt:@[1040px]:grid-cols-[minmax(0,1fr)_340px]">
+      <div className="wt:grid wt:grid-cols-1 wt:gap-3.5 wt:@[1040px]:grid-cols-[minmax(0,1fr)_340px]">
         <div className="wt:flex wt:min-w-0 wt:flex-col wt:gap-3.5">
           <div className="wt:grid wt:grid-cols-1 wt:gap-3.5 wt:@[640px]:grid-cols-[1.1fr_1.25fr_1fr]">
             <WeightCard o={o} onWeigh={openWeigh} />
@@ -99,10 +99,6 @@ export function WeightPage({ params }: PluginPageProps) {
             <Legend goal={profile?.goalKg != null} />
           </Card>
 
-          <div className="wt:grid wt:grid-cols-1 wt:gap-3.5 wt:@[760px]:grid-cols-2">
-            <HabitGrid ledger={ledger} today={today} budgetKnown={profile != null} moveGoal={moveGoal} />
-            <GroupCompare days={ledger.days} />
-          </div>
         </div>
 
         <div className="wt:flex wt:min-w-0 wt:flex-col wt:gap-3.5">
@@ -131,10 +127,15 @@ export function WeightPage({ params }: PluginPageProps) {
             moveGoal={moveGoal}
           />
           <AIPanel
+            className="wt:flex-1"
             stamp={stamp}
             input={{ now: time, profile, overview: o, days: ledger.days, todayEntries }}
           />
         </div>
+      </div>
+      <div className="wt:mt-3.5 wt:grid wt:grid-cols-1 wt:gap-3.5 wt:@[760px]:grid-cols-2">
+        <HabitGrid ledger={ledger} today={today} budgetKnown={profile != null} moveGoal={moveGoal} />
+        <GroupCompare days={ledger.days} />
       </div>
       <WeighDialog
         state={weigh}

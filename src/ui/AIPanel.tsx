@@ -4,7 +4,7 @@
  */
 import { useEffect, useRef, useState } from "react";
 import { RefreshCw, Sparkles } from "lucide-react";
-import { Button, IconButton, Segmented } from "@tau/ui";
+import { Button, IconButton, Segmented, cn } from "@tau/ui";
 import { aiErrorMessage, needsSetup, type AIScope, type AnalysisInput } from "../ai";
 import { useRuntime } from "../runtime";
 import { Card } from "./bits";
@@ -16,7 +16,7 @@ interface Result {
   done: boolean;
 }
 
-export function AIPanel({ input, stamp }: { input: AnalysisInput; stamp: string }) {
+export function AIPanel({ input, stamp, className }: { input: AnalysisInput; stamp: string; className?: string }) {
   const { ai, context } = useRuntime();
   const [scope, setScope] = useState<AIScope>("today");
   const [results, setResults] = useState<Partial<Record<AIScope, Result>>>({});
@@ -56,7 +56,7 @@ export function AIPanel({ input, stamp }: { input: AnalysisInput; stamp: string 
   const streaming = result != null && !result.done;
   const stale = result?.done && result.stamp !== stamp;
   return (
-    <Card className="wt:relative wt:flex wt:flex-col wt:gap-2.5 wt:overflow-hidden wt:px-4 wt:py-3.5">
+    <Card className={cn("wt:relative wt:flex wt:flex-col wt:gap-2.5 wt:overflow-hidden wt:px-4 wt:py-3.5", className)}>
       <div
         aria-hidden
         className="wt:pointer-events-none wt:absolute wt:inset-0"
@@ -114,7 +114,7 @@ export function AIPanel({ input, stamp }: { input: AnalysisInput; stamp: string 
           </button>
         )}
       </div>
-      <p className="wt:text-ink-3 wt:relative wt:text-[11px]">
+      <p className="wt:text-ink-3 wt:relative wt:mt-auto wt:text-[11px]">
         AI 只读取体重、热量和饮食运动的文字，使用「对话功能」的模型
       </p>
     </Card>
