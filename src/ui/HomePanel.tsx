@@ -1,7 +1,8 @@
 /**
  * 首页「减重」卡：今天晨重（没称时给称重入口）、还能吃多少 kcal、运动进度，下面是一句话记录。
  */
-import { ChevronRight, Footprints, Sunrise } from "lucide-react";
+import type { ReactNode } from "react";
+import { ChevronRight } from "lucide-react";
 import { cn } from "@tau/ui";
 import { useRuntime } from "../runtime";
 import { Delta, MOVE_COLOR, kg } from "./bits";
@@ -19,51 +20,44 @@ export function HomePanel() {
   const delta = t.am != null && o.yesterday?.am != null ? t.am - o.yesterday.am : null;
   const hasBudget = t.budget > 0;
   const over = hasBudget && t.remaining < 0;
+  const unit = (text: string) => <small className="wt:text-ink-3 wt:ml-1 wt:text-[11px] wt:font-normal">{text}</small>;
   return (
-    <div className="wt:flex wt:flex-col wt:gap-3 wt:px-1">
-      <div className="wt:grid wt:grid-cols-3 wt:gap-3">
-        <button
-          type="button"
-          onClick={() => void pages.main?.open(t.am == null ? { weigh: "am" } : {})}
-          className="wt:hover:bg-hover wt:flex wt:flex-col wt:items-start wt:rounded-[10px] wt:px-2 wt:py-1.5 wt:text-left"
+    <div className="wt:flex wt:flex-col wt:gap-3">
+      <div className="wt:grid wt:grid-cols-3 wt:gap-4">
+        <Stat
+          label="晨重"
+          foot={t.am == null ? "今天还没称" : <>较昨天 <Delta value={delta} suffix=" kg"/></>}
         >
-          <span className="wt:text-ink-3 wt:flex wt:items-center wt:gap-1 wt:text-[11.5px]">
-            <Sunrise className="wt:size-3" />
-            晨重
-          </span>
           {t.am == null ? (
-            <span className="wt:text-accent-text wt:text-[13px] wt:leading-[1.9] wt:font-medium">＋ 称一下</span>
+            <button
+              type="button"
+              onClick={() => void pages.main?.open({ weigh: "am" })}
+              className="wt:text-accent-text wt:hover:underline wt:text-[14px] wt:font-medium"
+            >
+              ＋ 称一下
+            </button>
           ) : (
-            <span className="wt:flex wt:items-baseline wt:gap-1.5">
-              <b className="wt:text-[20px] wt:font-semibold wt:tabular-nums">{kg(t.am)}</b>
-              <Delta value={delta} className="wt:text-[11.5px]" />
-            </span>
+            <>
+              {kg(t.am)}
+              {unit("kg")}
+            </>
           )}
-        </button>
-        <div className="wt:flex wt:flex-col wt:px-2 wt:py-1.5">
-          <span className="wt:text-ink-3 wt:text-[11.5px]">{over ? "已超预算" : "还能吃"}</span>
-          {hasBudget ? (
-            <b className={cn("wt:text-[20px] wt:font-semibold wt:tabular-nums", over && "wt:text-danger")}>
-              {Math.abs(t.remaining)}
-              <small className="wt:text-ink-3 wt:ml-1 wt:text-[11px] wt:font-normal">kcal</small>
-            </b>
-          ) : (
-            <span className="wt:text-ink-2 wt:text-[12.5px] wt:leading-[1.9]">已吃 {t.intake} kcal</span>
-          )}
-        </div>
-        <div className="wt:flex wt:flex-col wt:px-2 wt:py-1.5">
-          <span className="wt:text-ink-3 wt:flex wt:items-center wt:gap-1 wt:text-[11.5px]">
-            <Footprints className="wt:size-3" />
-            运动
-          </span>
-          <b className="wt:text-[20px] wt:font-semibold wt:tabular-nums">
-            {t.moveMinutes}
-            <small className="wt:text-ink-3 wt:ml-1 wt:text-[11px] wt:font-normal">/ {moveGoal} 分钟</small>
-          </b>
-          <div className="wt:bg-track wt:mt-1 wt:h-1.5 wt:overflow-hidden wt:rounded-full">
-            <div className="wt:h-full wt:rounded-full" style={{ width: `${Math.min(100, (t.moveMinutes / moveGoal) * 100)}%`, background: MOVE_COLOR }} />
-          </div>
-        </div>
+        </Stat>
+        <Stat label={over ? "已超预算" : "还能吃"} danger={over} foot={hasBudget ? `已吃 ${t.intake} kcal` : "未设热量预算"}>
+          {hasBudget ? Math.abs(t.remaining) : t.intake}
+          {unit("kcal")}
+        </Stat>
+        <Stat
+          label="运动"
+          foot={
+            <div className="wt:bg-track wt:h-1.5 wt:w-full wt:overflow-hidden wt:rounded-full">
+              <div className="wt:h-full wt:rounded-full" style={{ width: `${Math.min(100, (t.moveMinutes / moveGoal) * 100)}%`, background: MOVE_COLOR }} />
+            </div>
+          }
+        >
+          {t.moveMinutes}
+          {unit(`/ ${moveGoal} 分钟`)}
+        </Stat>
       </div>
       <QuickLog
         today={today}
@@ -75,11 +69,26 @@ export function HomePanel() {
       <button
         type="button"
         onClick={() => void pages.main?.open()}
-        className="wt:text-ink-3 wt:hover:text-ink-1 wt:inline-flex wt:items-center wt:gap-0.5 wt:self-start wt:rounded-[6px] wt:px-1 wt:py-0.5 wt:text-[12px]"
+        className="wt:text-ink-3 wt:hover:text-ink-1 wt:-my-0.5 wt:inline-flex wt:items-center wt:gap-0.5 wt:self-start wt:py-0.5 wt:text-[12px]"
       >
         查看趋势
         <ChevronRight className="wt:size-[13px]" strokeWidth={1.75} />
       </button>
+    </div>
+  );
+}
+
+/** 指标格：标签 / 单行数字 / 固定高度的底行（进度条或一行说明），同排各格基线对齐 */
+function Stat({ label, danger, foot, children }: { label: string; danger?: boolean; foot: ReactNode; children: ReactNode }) {
+  return (
+    <div className="wt:flex wt:min-w-0 wt:flex-col wt:gap-1">
+      <span className="wt:text-ink-3 wt:truncate wt:text-[11.5px]">{label}</span>
+      <b className={cn("wt:flex wt:h-[26px] wt:items-baseline wt:truncate wt:text-[20px] wt:leading-[26px] wt:font-semibold wt:tabular-nums", danger && "wt:text-danger")}>
+        {children}
+      </b>
+      <div className="wt:text-ink-3 wt:flex wt:h-4 wt:min-w-0 wt:items-center wt:text-[11.5px] wt:tabular-nums">
+        {typeof foot === "string" ? <span className="wt:truncate">{foot}</span> : foot}
+      </div>
     </div>
   );
 }
