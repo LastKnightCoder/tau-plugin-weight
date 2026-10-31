@@ -64,7 +64,7 @@ export default definePlugin({
         id: "today",
         title: "减重",
         size: "compact",
-        action: mobile ? undefined : { title: "查看趋势", run: () => page.open() },
+        action: { title: mobile ? "查看" : "查看趋势", run: () => page.open() },
         component: props => (
           <RuntimeProvider runtime={runtime}>
             {mobile ? <MobileHomePanel {...props} /> : <HomePanel />}

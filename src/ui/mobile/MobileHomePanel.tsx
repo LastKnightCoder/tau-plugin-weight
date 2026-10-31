@@ -68,14 +68,24 @@ export function MobileHomePanel({ registerDismiss }: PluginHomePanelProps) {
         <span className="wt:mt-auto wt:flex wt:gap-1.5 wt:pt-2">
           <button
             type="button"
-            onClick={openWeigh}
+            onClick={event => {
+              event.stopPropagation();
+              openWeigh();
+            }}
             className={cn(button, needWeigh ? "wt:bg-accent wt:text-ink-inverse" : "wt:bg-hover wt:text-ink-1")}
           >
             <Scale />
             称重
           </button>
           {!needWeigh && (
-            <button type="button" onClick={() => void pages.main?.open({ log: true })} className={cn(button, "wt:bg-accent-soft wt:text-accent-text")}>
+            <button
+              type="button"
+              onClick={event => {
+                event.stopPropagation();
+                void pages.main?.open({ log: true });
+              }}
+              className={cn(button, "wt:bg-accent-soft wt:text-accent-text")}
+            >
               <Plus />
               记一笔
             </button>
