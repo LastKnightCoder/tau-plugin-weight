@@ -116,8 +116,6 @@ export function WeightPage({ params }: PluginPageProps) {
                   </div>
                   <div ref={logRef}>
                     <QuickLog
-                      today={today}
-                      time={time}
                       remaining={t.budget > 0 ? t.remaining : null}
                       kg={o.latestAvg}
                       hasProfile={profile != null}

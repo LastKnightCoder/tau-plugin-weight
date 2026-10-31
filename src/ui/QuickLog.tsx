@@ -8,6 +8,7 @@ import { useQueryClient } from "@tanstack/react-query";
 import { Footprints, SendHorizontal, Sparkles, UtensilsCrossed } from "lucide-react";
 import { Button, IconButton, Spinner, cn, toast } from "@tau/ui";
 import { aiErrorMessage, needsSetup } from "../ai";
+import { dateKey, timeKey } from "../data/model";
 import { fromMemory, type Draft } from "../data/parse";
 import { WEIGHT_KEY, useRuntime } from "../runtime";
 import { FOOD_COLOR, MOVE_COLOR } from "./bits";
@@ -16,16 +17,12 @@ import { useFoods } from "./queries";
 const DEBOUNCE = 700;
 
 export function QuickLog({
-  today,
-  time,
   remaining,
   kg,
   hasProfile,
   examples = [],
   autoFocus,
 }: {
-  today: string;
-  time: string;
   /** 当前余额；没填身体数据时为 null，只显示热量 */
   remaining: number | null;
   kg: number | null;
@@ -98,9 +95,10 @@ export function QuickLog({
     setSaving(true);
     requestRef.current?.abort();
     try {
+      const now = new Date();
       const entry = await data.addEntry({
-        date: today,
-        time,
+        date: dateKey(now),
+        time: timeKey(now),
         kind: draft.kind,
         text: draft.text,
         kcal: valid ? kcal : 0,

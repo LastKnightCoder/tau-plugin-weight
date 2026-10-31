@@ -10,7 +10,7 @@ import { useLedger, useNow } from "./queries";
 
 export function HomePanel() {
   const { pages } = useRuntime();
-  const { today, time } = useNow();
+  const { today } = useNow();
   const query = useLedger(14, today);
   if (!query.data) return null;
   const { overview: o, profile } = query.data;
@@ -59,8 +59,6 @@ export function HomePanel() {
         </Stat>
       </div>
       <QuickLog
-        today={today}
-        time={time}
         remaining={t.budget > 0 ? t.remaining : null}
         kg={o.latestAvg}
         hasProfile={profile != null}
