@@ -6,11 +6,13 @@ describe("manifest", () => {
     expect(manifest.permissions).toContain("ai:chat");
   });
 
-  it("只用到插件记录和存储，不申请用户数据权限", () => {
-    expect(manifest.permissions.filter(p => !p.startsWith("ai:"))).toEqual([]);
+  it("除 AI 外只申请语音输入，不申请用户数据权限", () => {
+    expect(manifest.permissions.filter(p => !p.startsWith("ai:"))).toEqual(["speech:input"]);
   });
 
-  it("页面依赖首页、侧边栏与 AI，只声明桌面", () => {
-    expect(Object.keys(manifest.targets)).toEqual(["desktop"]);
+  it("三端都声明，手机最低版本覆盖首页卡片与语音输入", () => {
+    expect(Object.keys(manifest.targets).sort()).toEqual(["android", "desktop", "ios"]);
+    expect(manifest.targets.android.minAppVersion).toBe("0.2.16");
+    expect(manifest.targets.ios.minAppVersion).toBe("0.2.16");
   });
 });

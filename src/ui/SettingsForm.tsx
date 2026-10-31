@@ -10,7 +10,7 @@ import { dailyBudget } from "../data/stats";
 import { WEIGHT_KEY, useRuntime } from "../runtime";
 import { useLedger, useNow, useProfile } from "./queries";
 
-interface Draft {
+export interface Draft {
   heightCm: string;
   birthYear: string;
   sex: Sex;
@@ -20,7 +20,7 @@ interface Draft {
   budgetOverride: string;
 }
 
-const toDraft = (p: Profile | null): Draft => ({
+export const toDraft = (p: Profile | null): Draft => ({
   heightCm: p ? String(p.heightCm) : "",
   birthYear: p ? String(p.birthYear) : "",
   sex: p?.sex ?? "male",
@@ -32,7 +32,7 @@ const toDraft = (p: Profile | null): Draft => ({
 
 const num = (s: string) => (s.trim() === "" ? null : Number(s));
 
-function validate(d: Draft, year: number): { profile: Profile | null; errors: Partial<Record<keyof Draft, string>> } {
+export function validate(d: Draft, year: number): { profile: Profile | null; errors: Partial<Record<keyof Draft, string>> } {
   const errors: Partial<Record<keyof Draft, string>> = {};
   const height = num(d.heightCm);
   const birth = num(d.birthYear);

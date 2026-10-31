@@ -122,7 +122,7 @@ export function AIPanel({ input, stamp, className }: { input: AnalysisInput; sta
 }
 
 /** 只渲染 **粗体** 与分段，其余原样显示 */
-function Rendered({ text, streaming }: { text: string; streaming: boolean }) {
+export function Rendered({ text, streaming }: { text: string; streaming: boolean }) {
   const paragraphs = text.split(/\n{1,}/).filter(p => p.trim());
   return (
     <div className="wt:flex wt:flex-col wt:gap-2">

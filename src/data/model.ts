@@ -6,6 +6,11 @@ import type { JsonValue, PluginRecord } from "@tau/plugins";
 
 export type WeighSlot = "am" | "pm";
 export type EntryKind = "food" | "move";
+/**
+ * 热量的估算状态：ready 已定；pending 已记下、AI 在后台估算；failed 估算失败、等用户填。
+ * 非 ready 的条目不计入余额与「少吃」判定，kcal 为 0。
+ */
+export type EntryEstimate = "ready" | "pending" | "failed";
 export type Sex = "male" | "female";
 
 export interface Weigh {
@@ -27,9 +32,10 @@ export interface Entry {
   kcal: number;
   /** 运动时长；饮食为 0 */
   minutes: number;
+  estimate: EntryEstimate;
 }
 
-export type EntryInput = Omit<Entry, "id" | "revision">;
+export type EntryInput = Omit<Entry, "id" | "revision" | "estimate"> & { estimate?: EntryEstimate };
 
 export interface Profile {
   heightCm: number;
@@ -69,7 +75,7 @@ export function parseWeigh(record: PluginRecord): Weigh | null {
 }
 
 export function parseEntry(record: PluginRecord): Entry | null {
-  const { date, time, kind, text, kcal, minutes } = record.data;
+  const { date, time, kind, text, kcal, minutes, estimate } = record.data;
   if (typeof date !== "string" || !DATE_RE.test(date)) return null;
   if (kind !== "food" && kind !== "move") return null;
   if (typeof text !== "string" || !finite(kcal) || kcal < 0) return null;
@@ -82,8 +88,12 @@ export function parseEntry(record: PluginRecord): Entry | null {
     text,
     kcal: Math.round(kcal),
     minutes: kind === "move" && finite(minutes) && minutes > 0 ? Math.round(minutes) : 0,
+    // 旧版记录没有这个字段，都已有热量
+    estimate: estimate === "pending" || estimate === "failed" ? estimate : "ready",
   };
 }
+
+export const countsTowardBudget = (entry: Pick<Entry, "estimate">) => entry.estimate === "ready";
 
 export function parseProfile(value: JsonValue | undefined): Profile | null {
   if (!isObject(value)) return null;

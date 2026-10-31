@@ -4,9 +4,10 @@
  * - 每日预算 = 按身体数据算出的日常消耗 − 500，体重下降后随之下调；设置了手动预算时用手动值；
  * - 余额 = 预算 + 运动消耗 − 摄入；「少吃」= 记了饮食且余额 ≥ 0，「多动」= 运动分钟达标；
  *   没记饮食、还没有预算（未填身体数据或从没称过）的日子既不算少吃也不算没少吃（unknown）；
+ *   热量还在估算或估算失败的条目不计入摄入与消耗（运动分钟照常计入「多动」），当天有这类饮食时少吃判为 unknown；
  *   今天在一天结束前不判定做到，已经超了则直接算没做到。
  */
-import { addDays, daysBetween, type Entry, type Profile, type Weigh } from "./model";
+import { addDays, countsTowardBudget, daysBetween, type Entry, type Profile, type Weigh } from "./model";
 
 export const DEFICIT = 500;
 
@@ -31,6 +32,8 @@ export interface DaySummary {
   date: string;
   am: number | null;
   pm: number | null;
+  /** 热量还没定的条目数（估算中或失败） */
+  unsettled: number;
   /** 7 日晨重均值；窗口内没有晨重时为 null */
   avg: number | null;
   /** 次日晨重 − 当日晨重；任一缺失为 null */
@@ -82,12 +85,15 @@ export function buildLedger(
   const total = daysBetween(from, to);
   for (let k = 0; k <= total; k++) {
     const date = addDays(from, k);
-    const list = byDay.get(date) ?? [];
+    const all = byDay.get(date) ?? [];
+    const list = all.filter(countsTowardBudget);
+    const unsettled = all.length - list.length;
+    const unsettledFood = all.some(e => e.kind === "food" && !countsTowardBudget(e));
     const intake = list.filter(e => e.kind === "food").reduce((s, e) => s + e.kcal, 0);
-    const foodCount = list.filter(e => e.kind === "food").length;
-    const moves = list.filter(e => e.kind === "move");
-    const burn = moves.reduce((s, e) => s + e.kcal, 0);
-    const moveMinutes = moves.reduce((s, e) => s + e.minutes, 0);
+    const foodCount = all.filter(e => e.kind === "food").length;
+    const burn = list.filter(e => e.kind === "move").reduce((s, e) => s + e.kcal, 0);
+    // 分钟数在记录时就已识别，「多动」不必等热量估算
+    const moveMinutes = all.filter(e => e.kind === "move").reduce((s, e) => s + e.minutes, 0);
     const avg = avgOf(date);
     if (avg != null) lastKg = avg;
     const budget =
@@ -107,9 +113,17 @@ export function buildLedger(
       burn,
       moveMinutes,
       foodCount,
+      unsettled,
       budget,
       remaining,
-      eat: budget === 0 || foodCount === 0 ? "unknown" : remaining >= 0 ? (live ? "unknown" : "ok") : "miss",
+      eat:
+        budget === 0 || foodCount === 0
+          ? "unknown"
+          : remaining < 0
+            ? "miss"
+            : live || unsettledFood
+              ? "unknown"
+              : "ok",
       move: moveMinutes >= moveGoal ? "ok" : live ? "unknown" : "miss",
     });
   }

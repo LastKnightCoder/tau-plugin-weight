@@ -33,7 +33,7 @@ export function QuickLog({
   examples?: readonly string[];
   autoFocus?: boolean;
 }) {
-  const { data, ai, context } = useRuntime();
+  const { data, ai, context, estimates } = useRuntime();
   const client = useQueryClient();
   const foods = useFoods();
   const [text, setText] = useState("");
@@ -89,24 +89,29 @@ export function QuickLog({
 
   const kcal = kcalText.trim() === "" ? null : Math.max(0, Math.round(Number(kcalText)));
   const valid = draft != null && kcal != null && Number.isFinite(kcal);
+  // 还没有热量也可以记：先以「估算中」记下，后台补上
+  const canSubmit = draft != null && (valid || kcalText.trim() === "");
   const after = valid && remaining != null ? remaining + (draft.kind === "move" ? kcal : -kcal) : null;
 
   const submit = async () => {
-    if (!valid || saving) return;
+    if (!draft || !canSubmit || saving) return;
     setSaving(true);
+    requestRef.current?.abort();
     try {
-      await data.addEntry({
+      const entry = await data.addEntry({
         date: today,
         time,
         kind: draft.kind,
         text: draft.text,
-        kcal,
+        kcal: valid ? kcal : 0,
         minutes: draft.kind === "move" ? draft.minutes : 0,
+        estimate: valid ? "ready" : "pending",
       });
-      if (draft.kind === "food" && (draft.source !== "memory" || kcal !== draft.kcal))
+      if (valid && draft.kind === "food" && (draft.source !== "memory" || kcal !== draft.kcal))
         await data.rememberFood(draft.text, kcal);
+      if (!valid) void estimates.enqueue(entry);
       if (context.signal.aborted) return;
-      toast.success(`已记下 ${draft.text}`);
+      toast.success(valid ? `已记下 ${draft.text}` : `已记下 ${draft.text}，热量在后台估算`);
       setText("");
       await client.invalidateQueries({ queryKey: WEIGHT_KEY });
       inputRef.current?.focus();
@@ -141,7 +146,7 @@ export function QuickLog({
           aria-label="一句话记录饮食或运动"
           className="wt:text-tau-body wt:placeholder:text-ink-3 wt:min-w-0 wt:flex-1 wt:bg-transparent wt:outline-none"
         />
-        <IconButton aria-label="记下" disabled={!valid || saving} onClick={() => void submit()}>
+        <IconButton aria-label="记下" disabled={!canSubmit || saving} onClick={() => void submit()}>
           {saving ? <Spinner /> : <SendHorizontal className="wt:size-[15px]" strokeWidth={1.75} />}
         </IconButton>
       </div>

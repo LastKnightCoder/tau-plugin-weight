@@ -1,14 +1,20 @@
 {
   "id": "tau.weight",
   "name": "减重",
-  "description": "记录早晚体重、吃了什么和运动，随时看到今天还能吃多少，用图表和 AI 看清少吃多动的效果。",
+  "description": "记录早晚体重、吃了什么和运动，随时看到今天还能吃多少，用图表和 AI 看清少吃多动的效果。手机上可以按住说话一次记好几样。",
   "categories": ["page"],
   "keywords": ["减肥", "减重", "体重", "热量", "卡路里", "运动"],
-  "permissions": ["ai:chat"],
+  "permissions": ["ai:chat", "speech:input"],
   "version": "0.1.4",
   "targets": {
     "desktop": {
       "minAppVersion": "0.59.4"
+    },
+    "android": {
+      "minAppVersion": "0.2.16"
+    },
+    "ios": {
+      "minAppVersion": "0.2.16"
     }
   }
 }

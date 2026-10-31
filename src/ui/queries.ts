@@ -55,3 +55,8 @@ export function useFoods() {
   const { data } = useRuntime();
   return useQuery({ queryKey: [...WEIGHT_KEY, "foods"], queryFn: () => data.getFoods() });
 }
+
+export function usePrefs() {
+  const { data } = useRuntime();
+  return useQuery({ queryKey: [...WEIGHT_KEY, "prefs"], queryFn: () => data.getPrefs() });
+}

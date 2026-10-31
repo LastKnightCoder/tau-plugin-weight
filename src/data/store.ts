@@ -20,6 +20,7 @@ export const WEIGH = "weigh";
 export const ENTRY = "entry";
 const PROFILE_KEY = "profile";
 const FOODS_KEY = "foods";
+const PREFS_KEY = "prefs";
 const FOODS_LIMIT = 300;
 const PAGE = 200;
 
@@ -28,7 +29,10 @@ export type WeightStore = Pick<PluginContext, "records" | "storage">;
 
 export function registerCollections(context: Pick<PluginContext, "records">) {
   context.records.registerCollection({ name: WEIGH, indexes: { date: "string", slot: "string" } });
-  context.records.registerCollection({ name: ENTRY, indexes: { date: "string" } });
+  context.records.registerCollection({
+    name: ENTRY,
+    indexes: { date: "string", estimate: "string" },
+  });
 }
 
 async function queryAll(store: WeightStore, collection: string, from: string, to: string) {
@@ -48,6 +52,15 @@ async function queryAll(store: WeightStore, collection: string, from: string, to
 }
 
 export type FoodMemory = Record<string, number>;
+
+/** 本插件的界面偏好，随笔记库同步 */
+export interface WeightPrefs {
+  /** 手机首次打开的引导已走完（含跳过） */
+  onboarded: boolean;
+  /** 在今天页显示减重卡片 */
+  homeCard: boolean;
+}
+const DEFAULT_PREFS: WeightPrefs = { onboarded: false, homeCard: true };
 
 export function createWeightData(store: WeightStore) {
   return {
@@ -98,15 +111,38 @@ export function createWeightData(store: WeightStore) {
     },
 
     async addEntry(input: EntryInput): Promise<Entry> {
-      const record = await store.records.insert(ENTRY, { ...input });
+      const record = await store.records.insert(ENTRY, { ...input, estimate: input.estimate ?? "ready" });
       const entry = parseEntry(record);
       if (!entry) throw new Error("记录格式无效");
       return entry;
     },
 
-    async updateEntry(entry: Entry, patch: Partial<EntryInput>): Promise<void> {
+    async updateEntry(entry: Entry, patch: Partial<EntryInput>): Promise<Entry> {
       const { id, revision, ...rest } = entry;
-      await store.records.update(ENTRY, id, { ...rest, ...patch }, { expectedRevision: revision });
+      const record = await store.records.update(
+        ENTRY,
+        id,
+        { ...rest, ...patch },
+        { expectedRevision: revision }
+      );
+      const next = parseEntry(record);
+      if (!next) throw new Error("记录格式无效");
+      return next;
+    },
+
+    async getEntry(id: string): Promise<Entry | null> {
+      const record = await store.records.get(ENTRY, id);
+      return record ? parseEntry(record) : null;
+    },
+
+    /** 还在等后台估算的条目（上次没算完、被系统结束的也在内） */
+    async listPending(): Promise<Entry[]> {
+      const page = await store.records.query(ENTRY, {
+        where: { estimate: "pending" },
+        orderBy: { field: "date" },
+        limit: PAGE,
+      });
+      return page.items.map(parseEntry).filter((e): e is Entry => e !== null);
     },
 
     async deleteEntry(entry: Entry): Promise<void> {
@@ -119,6 +155,21 @@ export function createWeightData(store: WeightStore) {
 
     async saveProfile(profile: Profile): Promise<void> {
       await store.storage.set(PROFILE_KEY, profileToJson(profile));
+    },
+
+    async getPrefs(): Promise<WeightPrefs> {
+      const raw = await store.storage.get(PREFS_KEY);
+      if (!raw || typeof raw !== "object" || Array.isArray(raw)) return { ...DEFAULT_PREFS };
+      return {
+        onboarded: raw.onboarded === true,
+        homeCard: raw.homeCard !== false,
+      };
+    },
+
+    async savePrefs(patch: Partial<WeightPrefs>): Promise<WeightPrefs> {
+      const next = { ...(await this.getPrefs()), ...patch };
+      await store.storage.set(PREFS_KEY, { ...next });
+      return next;
     },
 
     async getFoods(): Promise<FoodMemory> {

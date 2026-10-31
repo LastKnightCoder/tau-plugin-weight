@@ -3,6 +3,8 @@ import { SIDEBAR_GROUPS, definePlugin, type PluginPageProps, type PluginSettings
 import { registerCollections } from "./data/store";
 import { createRuntime, RuntimeProvider } from "./runtime";
 import { HomePanel } from "./ui/HomePanel";
+import { MobileHomePanel } from "./ui/mobile/MobileHomePanel";
+import { MobileWeightPage } from "./ui/mobile/MobileWeightPage";
 import { SettingsForm } from "./ui/SettingsForm";
 import { WeightPage } from "./ui/WeightPage";
 
@@ -14,23 +16,40 @@ export default definePlugin({
     activate(context) {
       registerCollections(context);
       const runtime = createRuntime(context);
+      // 手机另有一套为触控设计的界面；数据、统计口径与 AI 两端共用
+      const mobile = context.environment.platform === "android" || context.environment.platform === "ios";
+      const Page = mobile ? MobileWeightPage : WeightPage;
       const page = context.pages.register({
         id: "weight",
         title: "减重",
         component: (props: PluginPageProps) => (
           <RuntimeProvider runtime={runtime}>
-            <WeightPage {...props} />
+            <Page {...props} />
           </RuntimeProvider>
         ),
       });
       runtime.pages.main = page;
-      context.sidebar.registerItem({
-        id: "weight",
-        title: "减重",
-        icon: Scale,
-        group: SIDEBAR_GROUPS.daily,
-        page,
-      });
+      // 手机的「趋势与效果」二级页
+      if (mobile)
+        runtime.pages.trend = context.pages.register({
+          id: "trend",
+          title: "趋势与效果",
+          component: (props: PluginPageProps) => (
+            <RuntimeProvider runtime={runtime}>
+              <MobileWeightPage {...props} params={{ ...props.params, view: "trend" }} />
+            </RuntimeProvider>
+          ),
+        });
+      if (mobile)
+        context.navigation.registerEntry({ id: "weight", title: "减重", icon: Scale, page });
+      else
+        context.sidebar.registerItem({
+          id: "weight",
+          title: "减重",
+          icon: Scale,
+          group: SIDEBAR_GROUPS.daily,
+          page,
+        });
       runtime.pages.settings = context.settings.register({
         id: "profile",
         title: "身体数据与目标",
@@ -45,10 +64,10 @@ export default definePlugin({
         id: "today",
         title: "减重",
         size: "compact",
-        action: { title: "查看趋势", run: () => page.open() },
-        component: () => (
+        action: mobile ? undefined : { title: "查看趋势", run: () => page.open() },
+        component: props => (
           <RuntimeProvider runtime={runtime}>
-            <HomePanel />
+            {mobile ? <MobileHomePanel {...props} /> : <HomePanel />}
           </RuntimeProvider>
         ),
       });

@@ -4,7 +4,7 @@
  */
 import { useState } from "react";
 import { useQueryClient } from "@tanstack/react-query";
-import { Footprints, Trash2, UtensilsCrossed } from "lucide-react";
+import { Footprints, Sparkles, Trash2, UtensilsCrossed } from "lucide-react";
 import { IconButton, toast } from "@tau/ui";
 import type { Entry } from "../data/model";
 import { WEIGHT_KEY, useRuntime } from "../runtime";
@@ -83,17 +83,18 @@ function Placeholder({ kind, label, children }: { kind: Entry["kind"]; label: st
 }
 
 function Row({ entry }: { entry: Entry }) {
-  const { data, context } = useRuntime();
+  const { data, context, estimates } = useRuntime();
   const client = useQueryClient();
   const [editing, setEditing] = useState<string | null>(null);
   const refresh = () => client.invalidateQueries({ queryKey: WEIGHT_KEY });
 
   const saveKcal = async () => {
-    const value = Number(editing);
+    const value = editing?.trim() ? Number(editing) : NaN;
     setEditing(null);
-    if (!Number.isFinite(value) || value < 0 || Math.round(value) === entry.kcal) return;
+    if (!Number.isFinite(value) || value < 0) return;
+    if (entry.estimate === "ready" && Math.round(value) === entry.kcal) return;
     try {
-      await data.updateEntry(entry, { kcal: Math.round(value) });
+      await data.updateEntry(entry, { kcal: Math.round(value), estimate: "ready" });
       if (entry.kind === "food") await data.rememberFood(entry.text, Math.round(value));
       if (!context.signal.aborted) await refresh();
     } catch {
@@ -106,10 +107,16 @@ function Row({ entry }: { entry: Entry }) {
       await data.deleteEntry(entry);
       await refresh();
       const { id: _id, revision: _revision, ...input } = entry;
+      // 撤销恢复的仍在等估算时，重新排队
+      const restore = () =>
+        data.addEntry(input).then(restored => {
+          if (restored.estimate === "pending") void estimates.enqueue(restored);
+          return refresh();
+        });
       toast.success(`已删除 ${entry.text}`, {
         action: {
           label: "撤销",
-          onClick: () => void data.addEntry(input).then(refresh).catch(() => toast.error("撤销失败")),
+          onClick: () => void restore().catch(() => toast.error("撤销失败")),
         },
       });
     } catch {
@@ -143,6 +150,19 @@ function Row({ entry }: { entry: Entry }) {
           aria-label="热量（千卡）"
           className="wt:border-accent wt:w-[52px] wt:rounded-[6px] wt:border wt:bg-transparent wt:px-1.5 wt:text-right wt:tabular-nums wt:outline-none"
         />
+      ) : entry.estimate === "pending" ? (
+        <span className="wt:text-ink-3 wt:inline-flex wt:items-center wt:gap-1 wt:px-1.5 wt:text-[11.5px]">
+          <Sparkles className="wt:size-[11px]" strokeWidth={1.75} />
+          估算中
+        </span>
+      ) : entry.estimate === "failed" ? (
+        <button
+          type="button"
+          onClick={() => setEditing("")}
+          className="wt:text-accent-text wt:bg-accent-soft wt:rounded-[6px] wt:px-1.5 wt:text-[11.5px] wt:font-medium"
+        >
+          填热量
+        </button>
       ) : (
         <button
           type="button"

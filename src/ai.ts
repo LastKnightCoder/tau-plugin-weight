@@ -3,7 +3,17 @@
  * 只发送插件算好的汇总：每日体重、摄入、运动与饮食文字，不发送照片，也不读取其他笔记。
  */
 import type { PluginAICapabilityClient, PluginContext } from "@tau/plugins";
-import { ESTIMATE_SYSTEM, estimatePrompt, parseEstimate, type Draft, type Estimate } from "./data/parse";
+import {
+  ESTIMATE_SYSTEM,
+  ORGANIZE_SYSTEM,
+  estimatePrompt,
+  organizePrompt,
+  parseEstimate,
+  parseOrganized,
+  type Draft,
+  type Estimate,
+  type Organized,
+} from "./data/parse";
 import type { Entry, Profile } from "./data/model";
 import type { DaySummary, Overview } from "./data/stats";
 import { compareGroups } from "./data/stats";
@@ -34,6 +44,26 @@ export function createAI(context: Pick<PluginContext, "ai">) {
       const estimate = parseEstimate(result.text);
       if (!estimate) throw new Error("AI_BAD_REPLY：没有得到可用的热量估算");
       return estimate;
+    },
+
+    /** 语音整理：拆条、估算并给一两句评估 */
+    async organize(
+      speech: string,
+      today: Parameters<typeof organizePrompt>[1],
+      kg: number | null,
+      signal?: AbortSignal
+    ): Promise<Organized> {
+      const result = await (await model()).chat({
+        messages: [
+          { role: "system", content: ORGANIZE_SYSTEM },
+          { role: "user", content: organizePrompt(speech, today, kg) },
+        ],
+        maxOutputTokens: 900,
+        signal,
+      });
+      const organized = parseOrganized(result.text);
+      if (!organized) throw new Error("AI_BAD_REPLY：没有整理出可用的记录");
+      return organized;
     },
 
     async *analyze(scope: AIScope, input: AnalysisInput, signal?: AbortSignal) {

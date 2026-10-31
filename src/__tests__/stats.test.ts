@@ -36,6 +36,7 @@ const food = (date: string, kcal: number): Entry => ({
   text: "饭",
   kcal,
   minutes: 0,
+  estimate: "ready",
 });
 const move = (date: string, minutes: number, kcal = 150): Entry => ({
   ...food(date, kcal),
@@ -231,5 +232,28 @@ describe("还没称过体重", () => {
       "2026-10-13"
     );
     expect(ledger.byDate.get("2026-10-12")).toMatchObject({ avg: null, budget: 1590, eat: "ok" });
+  });
+});
+
+describe("后台估算中的条目", () => {
+  const day = "2026-10-20";
+  const weighs = [weigh(day, 80)];
+  it("不计入摄入与消耗，运动分钟照常计入；有未定饮食时少吃不判定", () => {
+    const pending: Entry = { ...food(day, 0), estimate: "pending" };
+    const failedMove: Entry = { ...move(day, 40, 0), estimate: "failed" };
+    const ledger = buildLedger(day, day, weighs, [food(day, 600), pending, failedMove], profile, "2026-10-25");
+    const d = ledger.byDate.get(day)!;
+    expect(d.intake).toBe(600);
+    expect(d.burn).toBe(0);
+    expect(d.moveMinutes).toBe(40);
+    expect(d.unsettled).toBe(2);
+    expect(d.foodCount).toBe(2);
+    expect(d.eat).toBe("unknown");
+    expect(d.move).toBe("ok");
+  });
+  it("已定的摄入超了照样判为没少吃", () => {
+    const pending: Entry = { ...food(day, 0), estimate: "pending" };
+    const d = buildLedger(day, day, weighs, [food(day, 5000), pending], profile, "2026-10-25").byDate.get(day)!;
+    expect(d.eat).toBe("miss");
   });
 });

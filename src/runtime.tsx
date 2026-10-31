@@ -7,6 +7,8 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import type { PluginContext, PluginPageHandle, PluginSettingsHandle } from "@tau/plugins";
 import { createAI, type WeightAI } from "./ai";
 import { createWeightData, type WeightData } from "./data/store";
+import { createEstimateQueue, type EstimateQueue } from "./data/estimates";
+import { addDays } from "./data/model";
 
 export const WEIGHT_KEY = ["weight"] as const;
 
@@ -14,8 +16,10 @@ export interface WeightRuntime {
   context: PluginContext;
   data: WeightData;
   ai: WeightAI;
+  /** 后台估算：pending 条目在这里补上热量，离开页面也继续 */
+  estimates: EstimateQueue;
   queryClient: QueryClient;
-  pages: { main?: PluginPageHandle; settings?: PluginSettingsHandle };
+  pages: { main?: PluginPageHandle; trend?: PluginPageHandle; settings?: PluginSettingsHandle };
 }
 
 export function createRuntime(context: PluginContext): WeightRuntime {
@@ -26,13 +30,22 @@ export function createRuntime(context: PluginContext): WeightRuntime {
     void queryClient.invalidateQueries({ queryKey: WEIGHT_KEY });
   });
   context.register({ dispose: () => queryClient.clear() });
-  return {
-    context,
-    data: createWeightData(context),
-    ai: createAI(context),
-    queryClient,
-    pages: {},
-  };
+  const data = createWeightData(context);
+  const ai = createAI(context);
+  const estimates = createEstimateQueue({
+    data,
+    signal: context.signal,
+    // 运动消耗按记录当天附近的体重估算
+    estimate: async (entry, signal) => {
+      const recent = await data.listWeighs(addDays(entry.date, -7), entry.date).catch(() => []);
+      const kg = recent.filter(w => w.slot === "am").at(-1)?.kg ?? null;
+      return ai.estimate({ text: entry.text }, entry.kind === "move" ? kg : null, signal);
+    },
+  });
+  estimates.subscribe(() => void queryClient.invalidateQueries({ queryKey: WEIGHT_KEY }));
+  // 启用后补跑上次没算完的（应用被系统结束、离线时记下的）
+  void estimates.resume().catch(() => undefined);
+  return { context, data, ai, estimates, queryClient, pages: {} };
 }
 
 const RuntimeContext = createContext<WeightRuntime | null>(null);
