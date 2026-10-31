@@ -419,16 +419,21 @@ function AICard({ input, stamp }: { input: AnalysisInput; stamp: string }) {
   const { ai, context } = useRuntime();
   const [scope, setScope] = useState<AIScope>("today");
   const [results, setResults] = useState<Partial<Record<AIScope, { text: string; stamp: string; done: boolean }>>>({});
-  const [error, setError] = useState<{ message: string; setup: boolean } | null>(null);
+  const [error, setError] = useState<{ scope: AIScope; message: string; setup: boolean } | null>(null);
+  const [running, setRunning] = useState<AIScope | null>(null);
+  const [contentHeight, setContentHeight] = useState(0);
+  const content = useRef<HTMLDivElement>(null);
   const controller = useRef<AbortController | null>(null);
   const latest = useRef(input);
   latest.current = input;
   useEffect(() => () => controller.current?.abort(), []);
   const run = async () => {
+    if (controller.current && !controller.current.signal.aborted) return;
     const target = scope;
-    controller.current?.abort();
+    setContentHeight(content.current?.getBoundingClientRect().height ?? 0);
     const current = new AbortController();
     controller.current = current;
+    setRunning(target);
     setError(null);
     setResults(r => ({ ...r, [target]: { text: "", stamp, done: false } }));
     try {
@@ -438,6 +443,7 @@ function AICard({ input, stamp }: { input: AnalysisInput; stamp: string }) {
         text += delta;
         setResults(r => ({ ...r, [target]: { text, stamp, done: false } }));
       }
+      if (current.signal.aborted || context.signal.aborted) return;
       setResults(r => ({ ...r, [target]: { text, stamp, done: true } }));
     } catch (err) {
       if (current.signal.aborted) return;
@@ -447,10 +453,17 @@ function AICard({ input, stamp }: { input: AnalysisInput; stamp: string }) {
         return next;
       });
       const message = aiErrorMessage(err);
-      if (message) setError({ message, setup: needsSetup(err) });
+      if (message) setError({ scope: target, message, setup: needsSetup(err) });
+    } finally {
+      if (controller.current === current) {
+        controller.current = null;
+        setRunning(null);
+      }
     }
   };
   const result = results[scope];
+  const visibleError = error?.scope === scope ? error : null;
+  const streaming = running === scope;
   const stale = result?.done && result.stamp !== stamp;
   return (
     <MCard>
@@ -460,51 +473,59 @@ function AICard({ input, stamp }: { input: AnalysisInput; stamp: string }) {
         <span className="wt:flex-1" />
         <Pills<AIScope>
           value={scope}
-          onChange={setScope}
+          onChange={value => {
+            setScope(value);
+            setContentHeight(0);
+          }}
           options={[
             ["today", "今天"],
             ["week", "本周"],
           ]}
         />
       </div>
-      {result ? (
-        <div className="wt:text-[13.5px] wt:leading-[1.75]">
-          <Rendered text={result.text} streaming={!result.done} />
-          {stale && (
-            <div className="wt:text-ink-3 wt:mt-2.5 wt:flex wt:items-center wt:gap-1.5 wt:text-[12px]">
-              记录有变化，结果可能过时
-              <span className="wt:flex-1" />
-              <PrimaryButton small ghost onClick={() => void run()}>
-                <RefreshCw />
-                重新分析
-              </PrimaryButton>
-            </div>
-          )}
-        </div>
-      ) : (
-        <>
+      <div ref={content} style={{ minHeight: contentHeight }} aria-busy={streaming}>
+        {result && (result.text || result.done) ? (
+          <div className="wt:text-[13.5px] wt:leading-[1.75]">
+            <Rendered text={result.text} streaming={streaming} />
+            {stale && (
+              <div className="wt:text-ink-3 wt:mt-2.5 wt:flex wt:items-center wt:gap-1.5 wt:text-[12px]">
+                记录有变化，结果可能过时
+                <span className="wt:flex-1" />
+                <PrimaryButton small ghost disabled={running !== null} onClick={() => void run()}>
+                  <RefreshCw />
+                  重新分析
+                </PrimaryButton>
+              </div>
+            )}
+          </div>
+        ) : (
           <p className="wt:text-ink-3 wt:text-[13px] wt:leading-[1.7]">
-            {error
-              ? error.message
-              : scope === "today"
-                ? "看看晚饭还能吃多少、运动还差多少。点了才分析，不会自动消耗额度。"
-                : "总结最近两周的趋势，找出容易破功的规律。"}
+            {streaming
+              ? "正在分析，请稍候…"
+              : visibleError
+                ? visibleError.message
+                : scope === "today"
+                  ? "看看晚饭还能吃多少、运动还差多少。点了才分析，不会自动消耗额度。"
+                  : "总结最近两周的趋势，找出容易破功的规律。"}
           </p>
+        )}
+        {!result?.done && (
           <PrimaryButton
             className="wt:mt-3 wt:h-11 wt:text-[14.5px]"
-            onClick={() => (error?.setup ? void context.ai.openSettings() : void run())}
+            disabled={running !== null}
+            onClick={() => (visibleError?.setup ? void context.ai.openSettings() : void run())}
           >
-            {error?.setup ? (
+            {visibleError?.setup ? (
               "去配置模型"
             ) : (
               <>
                 <Sparkles />
-                {error ? "重试" : scope === "today" ? "分析今天" : "分析本周"}
+                {streaming ? "分析中…" : visibleError ? "重试" : scope === "today" ? "分析今天" : "分析本周"}
               </>
             )}
           </PrimaryButton>
-        </>
-      )}
+        )}
+      </div>
     </MCard>
   );
 }
