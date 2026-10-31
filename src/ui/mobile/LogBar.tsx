@@ -55,7 +55,12 @@ export function LogBar({
   useImperativeHandle(ref, () => ({
     fill(value) {
       setText(value);
-      requestAnimationFrame(() => inputRef.current?.focus());
+      requestAnimationFrame(() => {
+        const input = inputRef.current;
+        if (!input) return;
+        input.focus({ preventScroll: true });
+        input.setSelectionRange(input.value.length, input.value.length);
+      });
     },
   }));
 
@@ -109,7 +114,7 @@ export function LogBar({
   const showPreview = draft != null && focused;
 
   return (
-    <div className="wt:bg-page wt:shrink-0 wt:px-3 wt:py-2">
+    <div data-kb-optout="true" className="wt:bg-page wt:shrink-0 wt:px-3 wt:py-2">
       {talk.active ? (
         <TalkPanel talk={talk} />
       ) : showPreview ? (
