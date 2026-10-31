@@ -98,7 +98,6 @@ export function SettingsForm(_: PluginSettingsProps) {
     <div className="wt:flex wt:flex-col wt:items-end wt:gap-1">
       <div className="wt:flex wt:items-center wt:gap-2">
         <Input
-          size="sm"
           inputMode="decimal"
           value={draft[key]}
           placeholder={props.placeholder}
