@@ -5,10 +5,10 @@
   "categories": ["page"],
   "keywords": ["减肥", "减重", "体重", "热量", "卡路里", "运动"],
   "permissions": ["ai:chat", "speech:input"],
-  "version": "0.2.0",
+  "version": "0.2.1",
   "targets": {
     "desktop": {
-      "minAppVersion": "0.59.4"
+      "minAppVersion": "0.60.7"
     },
     "android": {
       "minAppVersion": "0.2.16"

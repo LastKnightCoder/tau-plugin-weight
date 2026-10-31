@@ -1,9 +1,9 @@
 /**
- * 设置：身体数据（算每日预算）、目标体重、运动目标、手动预算。即时校验，点保存才写入。
+ * 设置：身体数据（算每日预算）、目标体重、运动目标、手动预算。即时校验；保存条、⌘S 与离开确认由 Tau 提供。
  */
 import { useEffect, useState } from "react";
 import { useQueryClient } from "@tanstack/react-query";
-import type { PluginSettingsProps } from "@tau/plugins";
+import { useSettingsDraft, type PluginSettingsProps, type SettingsDraftChange } from "@tau/plugins";
 import { Button, Input, Loading, Segmented, Select, SettingRow, toast } from "@tau/ui";
 import { ACTIVITY_LEVELS, DEFAULT_MOVE_GOAL, type Profile, type Sex } from "../data/model";
 import { dailyBudget } from "../data/stats";
@@ -31,6 +31,31 @@ export const toDraft = (p: Profile | null): Draft => ({
 });
 
 const num = (s: string) => (s.trim() === "" ? null : Number(s));
+
+const LABELS: Record<keyof Draft, string> = {
+  sex: "性别",
+  heightCm: "身高",
+  birthYear: "出生年份",
+  activity: "日常活动",
+  goalKg: "目标体重",
+  moveGoal: "运动目标",
+  budgetOverride: "每日热量预算",
+};
+const UNITS: Partial<Record<keyof Draft, string>> = { heightCm: " cm", goalKg: " kg", moveGoal: " 分钟", budgetOverride: " kcal" };
+
+function show(key: keyof Draft, value: string) {
+  if (key === "sex") return value === "female" ? "女" : "男";
+  if (key === "activity") return ACTIVITY_LEVELS.find(level => String(level.value) === value)?.label ?? value;
+  if (!value) return key === "budgetOverride" ? "自动" : "";
+  return value + (UNITS[key] ?? "");
+}
+
+/** 与已保存的值逐项对比，给保存条与离开确认 */
+export function draftChanges(saved: Draft, draft: Draft): SettingsDraftChange[] {
+  return (Object.keys(LABELS) as (keyof Draft)[])
+    .filter(key => draft[key] !== saved[key])
+    .map(key => ({ label: LABELS[key], from: show(key, saved[key]), to: show(key, draft[key]) }));
+}
 
 export function validate(d: Draft, year: number): { profile: Profile | null; errors: Partial<Record<keyof Draft, string>> } {
   const errors: Partial<Record<keyof Draft, string>> = {};
@@ -66,26 +91,51 @@ export function SettingsForm(_: PluginSettingsProps) {
   const { today, date } = useNow();
   const ledger = useLedger(14, today);
   const [draft, setDraft] = useState<Draft | null>(null);
+  // 有错误仍点保存后，空字段也标出错误
+  const [showAll, setShowAll] = useState(false);
   const [saving, setSaving] = useState(false);
   useEffect(() => {
     if (profile.isSuccess && draft == null) setDraft(toDraft(profile.data));
   }, [profile.isSuccess, profile.data, draft]);
 
-  if (!draft) return <Loading minHeight={120} />;
   const year = date.getFullYear();
-  const { profile: next, errors } = validate(draft, year);
+  const saved = profile.isSuccess ? toDraft(profile.data) : null;
+  const { profile: next, errors } = draft ? validate(draft, year) : { profile: null, errors: {} };
+  const changes = draft && saved ? draftChanges(saved, draft) : [];
+
+  const save = async () => {
+    if (!next) throw new Error("请先修正填写有误的项");
+    await data.saveProfile(next);
+    if (context.signal.aborted) return;
+    await client.invalidateQueries({ queryKey: WEIGHT_KEY });
+    setDraft(toDraft(next));
+  };
+  const reset = () => {
+    setDraft(saved);
+    setShowAll(false);
+  };
+  // 第一次填写时也没有已存值可比，草稿本身就是待保存的修改
+  const hostDraft = useSettingsDraft({
+    dirty: changes.length > 0 || (profile.isSuccess && profile.data == null && draft != null),
+    errors: Object.keys(errors).length,
+    changes,
+    onInvalid: () => setShowAll(true),
+    save,
+    reset,
+  });
+
+  if (!draft) return <Loading minHeight={120} />;
   const set = (patch: Partial<Draft>) => setDraft({ ...draft, ...patch });
   const kgNow = ledger.data?.overview.latestAvg ?? null;
   const preview = next && kgNow != null ? dailyBudget({ ...next, budgetOverride: null }, kgNow, year) : null;
-  const touched = (key: keyof Draft) => draft[key] !== "" || profile.data != null;
+  const touched = (key: keyof Draft) => showAll || draft[key] !== "" || profile.data != null;
 
-  const save = async () => {
-    if (!next || saving) return;
+  // 不在 Tau 设置页里（没有宿主保存条）时用自带按钮
+  const saveHere = async () => {
+    if (saving) return;
     setSaving(true);
     try {
-      await data.saveProfile(next);
-      if (context.signal.aborted) return;
-      await client.invalidateQueries({ queryKey: WEIGHT_KEY });
+      await save();
       toast.success("已保存");
     } catch {
       toast.error("保存失败");
@@ -148,14 +198,16 @@ export function SettingsForm(_: PluginSettingsProps) {
       >
         {field("budgetOverride", { unit: "kcal", placeholder: preview != null ? String(preview) : "自动" })}
       </SettingRow>
-      <div className="wt:flex wt:justify-end wt:gap-2 wt:px-3 wt:pt-3">
-        <Button variant="secondary" disabled={saving} onClick={() => setDraft(toDraft(profile.data ?? null))}>
-          还原
-        </Button>
-        <Button disabled={!next} loading={saving} onClick={() => void save()}>
-          保存
-        </Button>
-      </div>
+      {!hostDraft && (
+        <div className="wt:flex wt:justify-end wt:gap-2 wt:px-3 wt:pt-3">
+          <Button variant="secondary" disabled={saving} onClick={reset}>
+            还原
+          </Button>
+          <Button disabled={!next} loading={saving} onClick={() => void saveHere()}>
+            保存
+          </Button>
+        </div>
+      )}
     </div>
   );
 }
