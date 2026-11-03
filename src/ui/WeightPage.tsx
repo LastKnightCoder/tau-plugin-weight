@@ -16,6 +16,7 @@ import { useLedger, useNow } from "./queries";
 import { TodayList } from "./TodayList";
 import { TrendChart } from "./TrendChart";
 import { WeighDialog, type WeighDialogState } from "./WeighDialog";
+import { defaultWeigh } from "./weighing";
 
 type Range = "14" | "30" | "90";
 const LEDGER_DAYS = 90;
@@ -30,22 +31,22 @@ export function WeightPage({ params }: PluginPageProps) {
   const [weigh, setWeigh] = useState<WeighDialogState | null>(null);
   const logRef = useRef<HTMLDivElement>(null);
 
-  const openWeigh = (slot: WeighSlot) => {
+  /** 不带日期时按当前时间定（凌晨归到昨天睡前）；趋势图补空缺时带上日期 */
+  const openWeigh = (slot?: WeighSlot, date?: string) => {
     const ledger = query.data?.ledger;
     if (!ledger) return;
-    const t = ledger.byDate.get(today);
-    const previous = [...ledger.days].reverse().find(d => d.date < today && d[slot] != null)?.[slot] ?? null;
-    setWeigh({ date: today, slot, initial: t?.[slot] ?? previous, previous });
+    const target = date && slot ? { date, slot } : defaultWeigh(new Date(), ledger, slot);
+    setWeigh({ ...target, today, ledger });
   };
 
-  // 带 weigh 参数进入（首页卡片、命令）时打开称重，随后去掉参数，再次进入同一参数仍会触发
-  const weighParam = params.weigh === "am" || params.weigh === "pm" ? params.weigh : null;
+  // 带 weigh 参数进入（首页卡片、命令）时打开称重，随后去掉参数，再次进入同一参数仍会触发；auto 按当前时间定时段
+  const weighParam = params.weigh === "am" || params.weigh === "pm" || params.weigh === "auto" ? params.weigh : null;
   const ready = query.data != null;
   const openWeighRef = useRef(openWeigh);
   openWeighRef.current = openWeigh;
   useEffect(() => {
     if (!weighParam || !ready) return;
-    openWeighRef.current(weighParam);
+    openWeighRef.current(weighParam === "auto" ? undefined : weighParam);
     void pages.main?.open({});
   }, [weighParam, ready, pages]);
 
@@ -76,7 +77,7 @@ export function WeightPage({ params }: PluginPageProps) {
             <div className="wt:grid wt:grid-cols-1 wt:gap-3.5 wt:@[1040px]:grid-cols-[minmax(0,1fr)_340px]">
               <div className="wt:flex wt:min-w-0 wt:flex-col wt:gap-3.5">
                 <div className="wt:grid wt:grid-cols-1 wt:gap-3.5 wt:@[640px]:grid-cols-[1.1fr_1.25fr_1fr]">
-                  <WeightCard o={o} onWeigh={openWeigh} />
+                  <WeightCard o={o} onWeigh={slot => openWeigh(slot)} />
                   <BudgetCard o={o} hasProfile={profile != null} onFocusLog={focusLog} onSetup={() => void pages.settings?.open()} />
                   <MoveCard o={o} moveGoal={moveGoal} />
                 </div>
@@ -95,7 +96,13 @@ export function WeightPage({ params }: PluginPageProps) {
                   </CardHead>
                   <div className="wt:px-1 wt:pt-2.5 wt:pr-3.5">
                     {ledger.days.some(d => d.am != null) || ledger.days.some(d => d.foodCount) ? (
-                      <TrendChart days={chartDays} today={today} goal={profile?.goalKg ?? null} showPm={showPm} />
+                      <TrendChart
+                        days={chartDays}
+                        today={today}
+                        goal={profile?.goalKg ?? null}
+                        showPm={showPm}
+                        onBackfill={date => openWeigh("am", date)}
+                      />
                     ) : (
                       <p className="wt:text-ink-3 wt:grid wt:h-[200px] wt:place-items-center wt:text-[12.5px]">
                         明早起床称一次，趋势从这里开始
@@ -144,11 +151,7 @@ export function WeightPage({ params }: PluginPageProps) {
           </div>
         </FadeScroll>
       </div>
-      <WeighDialog
-        state={weigh}
-        onClose={() => setWeigh(null)}
-        title={`称重 · ${dayLabel(today)}`}
-      />
+      <WeighDialog state={weigh} onClose={() => setWeigh(null)} />
     </div>
   );
 }

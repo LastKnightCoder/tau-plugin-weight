@@ -6,15 +6,15 @@ import { useState } from "react";
 import type { PluginHomePanelProps } from "@tau/plugins";
 import { Plus, Scale } from "lucide-react";
 import { cn } from "@tau/ui";
-import type { WeighSlot } from "../../data/model";
 import { useRuntime } from "../../runtime";
 import { kg, signed } from "../bits";
 import { useLedger, useNow, usePrefs } from "../queries";
+import { defaultWeigh, isLateNight, isMorning } from "../weighing";
 import { SheetHost } from "./Sheet";
 import { WeighSheet, type WeighTarget } from "./WeighSheet";
 
 export function MobileHomePanel({ registerDismiss }: PluginHomePanelProps) {
-  const { pages, data } = useRuntime();
+  const { pages } = useRuntime();
   const { today } = useNow();
   const query = useLedger(14, today);
   const prefs = usePrefs();
@@ -22,24 +22,15 @@ export function MobileHomePanel({ registerDismiss }: PluginHomePanelProps) {
   if (!query.data || !prefs.data || !prefs.data.homeCard) return null;
   const { overview: o, ledger } = query.data;
   const t = o.today;
-  const morning = new Date().getHours() < 14;
+  const now = new Date();
+  const morning = isMorning(now);
   const needWeigh = morning && t.am == null;
   const delta = t.am != null && o.yesterday?.am != null ? t.am - o.yesterday.am : null;
-  const slot: WeighSlot = morning || t.am == null ? "am" : "pm";
 
+  // 凌晨不指定时段，由 defaultWeigh 归到昨天睡前
   const openWeigh = () => {
-    const before = [...ledger.days].reverse().filter(d => d.date < today);
-    void data.listWeighs(today, today).then(list =>
-      setWeigh({
-        date: today,
-        slot,
-        am: t.am,
-        pm: t.pm,
-        previous: { am: before.find(d => d.am != null)?.am ?? null, pm: before.find(d => d.pm != null)?.pm ?? null },
-        avg: o.latestAvg,
-        existing: Object.fromEntries(list.map(w => [w.slot, w])),
-      })
-    );
+    const slot = isLateNight(now) ? undefined : morning || t.am == null ? "am" : "pm";
+    setWeigh({ ...defaultWeigh(new Date(), ledger, slot), today, ledger, avg: o.latestAvg });
   };
 
   const button = "wt:flex wt:h-8 wt:flex-1 wt:items-center wt:justify-center wt:gap-1 wt:rounded-[10px] wt:text-[12px] wt:font-semibold wt:[&>svg]:size-[13px]";

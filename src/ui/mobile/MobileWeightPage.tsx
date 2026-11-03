@@ -10,6 +10,7 @@ import { compareGroups } from "../../data/stats";
 import type { Entry, WeighSlot } from "../../data/model";
 import { useRuntime } from "../../runtime";
 import { useLedger, useNow, usePrefs } from "../queries";
+import { defaultWeigh } from "../weighing";
 import { useQueryClient } from "@tanstack/react-query";
 import { removeWithUndo } from "./actions";
 import { EntrySheet } from "./EntrySheet";
@@ -26,7 +27,7 @@ const HIGHLIGHT_MS = 2400;
 
 export function MobileWeightPage({ params, pageContext }: PluginPageProps) {
   const runtime = useRuntime();
-  const { pages, estimates, data } = runtime;
+  const { pages, estimates } = runtime;
   const client = useQueryClient();
   const { today, time } = useNow();
   const query = useLedger(LEDGER_DAYS, today);
@@ -61,35 +62,22 @@ export function MobileWeightPage({ params, pageContext }: PluginPageProps) {
     if (ready && view === "today" && !prefs.data!.onboarded && !query.data!.profile) setSetup("onboard");
   }, [ready, view, prefs.data, query.data]);
 
-  const openWeigh = (slot: WeighSlot) => {
+  /** 不带日期时按当前时间定（凌晨归到昨天睡前）；趋势页补空缺时带上日期 */
+  const openWeigh = (slot?: WeighSlot, date?: string) => {
     const ledger = query.data?.ledger;
     if (!ledger) return;
-    const t = ledger.byDate.get(today);
-    const before = [...ledger.days].reverse().filter(d => d.date < today);
-    void data.listWeighs(today, today).then(list => {
-      setWeigh({
-        date: today,
-        slot,
-        am: t?.am ?? null,
-        pm: t?.pm ?? null,
-        previous: {
-          am: before.find(d => d.am != null)?.am ?? null,
-          pm: before.find(d => d.pm != null)?.pm ?? null,
-        },
-        avg: query.data?.overview.latestAvg ?? null,
-        existing: Object.fromEntries(list.map(w => [w.slot, w])),
-      });
-    });
+    const target = date && slot ? { date, slot } : defaultWeigh(new Date(), ledger, slot);
+    setWeigh({ ...target, today, ledger, avg: query.data?.overview.latestAvg ?? null });
   };
 
-  // 带参数进入（今天页卡片、命令）时执行一次，随后去掉参数，再次进入同一参数仍会触发
-  const weighParam = params.weigh === "am" || params.weigh === "pm" ? params.weigh : null;
+  // 带参数进入（今天页卡片、命令）时执行一次，随后去掉参数，再次进入同一参数仍会触发；auto 按当前时间定时段
+  const weighParam = params.weigh === "am" || params.weigh === "pm" || params.weigh === "auto" ? params.weigh : null;
   const logParam = params.log === true || params.log === "1";
   const latestOpen = useRef(openWeigh);
   latestOpen.current = openWeigh;
   useEffect(() => {
     if (!ready || (!weighParam && !logParam)) return;
-    if (weighParam) latestOpen.current(weighParam);
+    if (weighParam) latestOpen.current(weighParam === "auto" ? undefined : weighParam);
     if (logParam) logRef.current?.fill("");
     void pages.main?.open({});
   }, [weighParam, logParam, ready, pages]);
@@ -119,7 +107,9 @@ export function MobileWeightPage({ params, pageContext }: PluginPageProps) {
           budgetKnown={profile != null}
           aiInput={{ now: time, profile, overview: o, days: ledger.days, todayEntries }}
           stamp={stamp}
+          onWeigh={(date, slot) => openWeigh(slot, date)}
         />
+        <WeighSheet target={weigh} onClose={() => setWeigh(null)} />
       </SheetHost.Provider>
     );
 
@@ -133,7 +123,7 @@ export function MobileWeightPage({ params, pageContext }: PluginPageProps) {
             o={o}
             hasProfile={profile != null}
             moveGoal={moveGoal}
-            onWeigh={openWeigh}
+            onWeigh={slot => openWeigh(slot)}
             onSetup={() => setSetup("profile")}
           />
           <TrendMini days={ledger.days.slice(-30)} o={o} groups={groups} onOpen={() => void pages.trend?.open()} />

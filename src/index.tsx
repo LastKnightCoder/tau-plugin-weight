@@ -75,7 +75,7 @@ export default definePlugin({
         id: "weigh",
         title: "减重：记录体重",
         run: async () => {
-          await page.open({ weigh: new Date().getHours() < 14 ? "am" : "pm" });
+          await page.open({ weigh: "auto" });
           return null;
         },
       });

@@ -6,7 +6,7 @@ import { useEffect, useMemo, useRef, useState, type PointerEvent } from "react";
 import { RefreshCw, Sparkles } from "lucide-react";
 import { cn } from "@tau/ui";
 import { aiErrorMessage, needsSetup, type AIScope, type AnalysisInput } from "../../ai";
-import { addDays } from "../../data/model";
+import { addDays, type WeighSlot } from "../../data/model";
 import { compareGroups, type DaySummary, type GroupStat, type Ledger } from "../../data/stats";
 import { useRuntime } from "../../runtime";
 import { FOOD_COLOR, GAIN_COLOR, LOSE_COLOR, MOVE_COLOR, dayLabel, kg, shortDate, signed, useWidth } from "../bits";
@@ -23,6 +23,7 @@ export function TrendView({
   budgetKnown,
   aiInput,
   stamp,
+  onWeigh,
 }: {
   ledger: Ledger;
   today: string;
@@ -31,6 +32,8 @@ export function TrendView({
   budgetKnown: boolean;
   aiInput: AnalysisInput;
   stamp: string;
+  /** 补记或修改某天的体重 */
+  onWeigh(date: string, slot: WeighSlot): void;
 }) {
   const [range, setRange] = useState<Range>(30);
   const days = useMemo(() => ledger.days.filter(d => d.date > addDays(today, -range)), [ledger, range, today]);
@@ -69,7 +72,7 @@ export function TrendView({
           )}
         </div>
         {days.some(d => d.am != null || d.foodCount) ? (
-          <TouchChart days={days} goal={goal} today={today} />
+          <TouchChart days={days} goal={goal} today={today} onBackfill={date => onWeigh(date, "am")} />
         ) : (
           <p className="wt:text-ink-3 wt:grid wt:h-[180px] wt:place-items-center wt:text-[12.5px]">明早起床称一次，趋势从这里开始</p>
         )}
@@ -82,7 +85,7 @@ export function TrendView({
           <Legend swatch={<i className="wt:bg-ink-3 wt:h-2.5 wt:w-2 wt:rounded-[2px] wt:opacity-45" />}>超预算</Legend>
         </div>
       </MCard>
-      <HabitCard ledger={ledger} today={today} moveGoal={moveGoal} budgetKnown={budgetKnown} />
+      <HabitCard ledger={ledger} today={today} moveGoal={moveGoal} budgetKnown={budgetKnown} onWeigh={onWeigh} />
       <GroupCard groups={compareGroups(ledger.days)} />
       <AICard input={aiInput} stamp={stamp} />
     </div>
@@ -125,10 +128,28 @@ const GAP = 14;
 const BAR_H = 52;
 const PAD_R = 30;
 
-/** 按住左右拖：竖线吸附到最近一天并显示读数，拖动期间不滚动页面 */
-function TouchChart({ days, goal, today }: { days: readonly DaySummary[]; goal: number | null; today: string }) {
+const LINGER_MS = 3000;
+
+/**
+ * 按住左右拖：竖线吸附到最近一天并显示读数，拖动期间不滚动页面。
+ * 停在没称晨重的那天松手，气泡保留 3 秒并给出「补记」。
+ */
+function TouchChart({
+  days,
+  goal,
+  today,
+  onBackfill,
+}: {
+  days: readonly DaySummary[];
+  goal: number | null;
+  today: string;
+  onBackfill(date: string): void;
+}) {
   const [ref, width] = useWidth<HTMLDivElement>();
   const [scrub, setScrub] = useState<number | null>(null);
+  const [linger, setLinger] = useState<number | null>(null);
+  const lingerTimer = useRef<number | undefined>(undefined);
+  useEffect(() => () => window.clearTimeout(lingerTimer.current), []);
   const hold = useRef<{ timer?: number; id: number; x: number; y: number; active: boolean } | null>(null);
   const values = days.flatMap(d => [d.am, d.avg]).filter((v): v is number => v != null);
   if (goal != null && values.length && Math.min(...values) - goal < 4) values.push(goal);
@@ -156,6 +177,8 @@ function TouchChart({ days, goal, today }: { days: readonly DaySummary[]; goal: 
     Math.min(n - 1, Math.max(0, Math.floor(((clientX - el.getBoundingClientRect().left) / plotW) * n)));
   const onDown = (e: PointerEvent<HTMLDivElement>) => {
     const el = e.currentTarget;
+    window.clearTimeout(lingerTimer.current);
+    setLinger(null);
     const state = { id: e.pointerId, x: e.clientX, y: e.clientY, active: false } as NonNullable<typeof hold.current>;
     hold.current = state;
     // 鼠标立即开始；触摸按住 200ms 才进入拖动，避免挡住页面滚动
@@ -184,10 +207,16 @@ function TouchChart({ days, goal, today }: { days: readonly DaySummary[]; goal: 
   };
   const onUp = () => {
     window.clearTimeout(hold.current?.timer);
+    const wasActive = hold.current?.active;
     hold.current = null;
+    if (wasActive && scrub != null && days[scrub]?.am == null) {
+      setLinger(scrub);
+      lingerTimer.current = window.setTimeout(() => setLinger(null), LINGER_MS);
+    }
     setScrub(null);
   };
-  const d = scrub != null ? days[scrub] : null;
+  const shown = scrub ?? linger;
+  const d = shown != null ? days[shown] : null;
 
   return (
     <div
@@ -203,10 +232,27 @@ function TouchChart({ days, goal, today }: { days: readonly DaySummary[]; goal: 
     >
       {d && (
         <div
-          className="wt:bg-ink-1 wt:text-ink-inverse wt:shadow-float wt:pointer-events-none wt:absolute wt:-top-1.5 wt:z-[1] wt:rounded-[12px] wt:px-2.5 wt:py-1.5 wt:text-[11.5px] wt:leading-[1.55] wt:whitespace-nowrap"
-          style={{ left: Math.min(Math.max(0, x(scrub!) - 70), Math.max(0, width - 160)) }}
+          className={cn(
+            "wt:bg-ink-1 wt:text-ink-inverse wt:shadow-float wt:absolute wt:-top-1.5 wt:z-[1] wt:rounded-[12px] wt:px-2.5 wt:py-1.5 wt:text-[11.5px] wt:leading-[1.55] wt:whitespace-nowrap",
+            linger == null && "wt:pointer-events-none"
+          )}
+          style={{ left: Math.min(Math.max(0, x(shown!) - 70), Math.max(0, width - 170)) }}
         >
-          {d.date === today ? "今天" : dayLabel(d.date)} · 晨重 <b className="wt:text-[13px] wt:tabular-nums">{kg(d.am)}</b>
+          {d.date === today ? "今天" : dayLabel(d.date)} · 晨重{" "}
+          {d.am != null ? <b className="wt:text-[13px] wt:tabular-nums">{kg(d.am)}</b> : <b>没称</b>}
+          {d.am == null && (
+            <button
+              type="button"
+              onPointerDown={e => e.stopPropagation()}
+              onClick={() => {
+                setLinger(null);
+                onBackfill(d.date);
+              }}
+              className="wt:text-accent-soft wt:ml-2 wt:font-[650]"
+            >
+              补记 ›
+            </button>
+          )}
           <br />
           均值 {kg(d.avg)} · {d.foodCount ? `吃了 ${d.intake} kcal${d.eat === "miss" ? "（超）" : ""}` : "饮食没记"}
         </div>
@@ -253,10 +299,10 @@ function TouchChart({ days, goal, today }: { days: readonly DaySummary[]; goal: 
               day.am != null ? <circle key={day.date} cx={x(i)} cy={y(day.am)} r={2.6} fill="var(--tau-ink-3)" opacity={0.55} /> : null
             )}
           <path d={line} fill="none" stroke="var(--tau-accent)" strokeWidth={2.4} strokeLinejoin="round" strokeLinecap="round" />
-          {scrub != null && (
+          {shown != null && (
             <g>
-              <line x1={x(scrub)} x2={x(scrub)} y1={0} y2={barTop + BAR_H} stroke="var(--tau-ink-1)" strokeWidth={1.2} />
-              {d?.avg != null && <circle cx={x(scrub)} cy={y(d.avg)} r={5} fill="var(--tau-bg-surface)" stroke="var(--tau-accent)" strokeWidth={2.4} />}
+              <line x1={x(shown)} x2={x(shown)} y1={0} y2={barTop + BAR_H} stroke="var(--tau-ink-1)" strokeWidth={1.2} />
+              {d?.avg != null && <circle cx={x(shown)} cy={y(d.avg)} r={5} fill="var(--tau-bg-surface)" stroke="var(--tau-accent)" strokeWidth={2.4} />}
             </g>
           )}
         </svg>
@@ -267,7 +313,19 @@ function TouchChart({ days, goal, today }: { days: readonly DaySummary[]; goal: 
 
 const WEEKS = 5;
 
-function HabitCard({ ledger, today, moveGoal, budgetKnown }: { ledger: Ledger; today: string; moveGoal: number; budgetKnown: boolean }) {
+function HabitCard({
+  ledger,
+  today,
+  moveGoal,
+  budgetKnown,
+  onWeigh,
+}: {
+  ledger: Ledger;
+  today: string;
+  moveGoal: number;
+  budgetKnown: boolean;
+  onWeigh(date: string, slot: WeighSlot): void;
+}) {
   const [picked, setPicked] = useState<string | null>(null);
   const weekday = (new Date(`${today}T00:00:00`).getDay() + 6) % 7;
   const firstMonday = addDays(today, -weekday - (WEEKS - 1) * 7);
@@ -294,6 +352,15 @@ function HabitCard({ ledger, today, moveGoal, budgetKnown }: { ledger: Ledger; t
         {day ? (
           <>
             {dayLabel(day.date)} · 晨重 {kg(day.am)} · {day.foodCount ? `吃了 ${day.intake}` : "饮食没记"} · 运动 {day.moveMinutes} 分钟
+            {(day.am == null || day.pm == null) && (
+              <button
+                type="button"
+                onClick={() => onWeigh(day.date, day.am == null ? "am" : "pm")}
+                className="wt:text-accent-text wt:ml-2 wt:font-semibold"
+              >
+                补称重
+              </button>
+            )}
           </>
         ) : (
           <span className="wt:text-ink-3 wt:inline-flex wt:flex-wrap wt:gap-x-3">

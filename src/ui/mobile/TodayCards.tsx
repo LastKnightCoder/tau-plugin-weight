@@ -8,6 +8,7 @@ import { cn } from "@tau/ui";
 import type { Entry, WeighSlot } from "../../data/model";
 import type { DaySummary, GroupStat, Overview } from "../../data/stats";
 import { MOVE_COLOR, dayLabel, kg, signed } from "../bits";
+import { isMorning } from "../weighing";
 import { KindIcon, MCard, Ring } from "./parts";
 
 export function HeroCard({
@@ -27,7 +28,7 @@ export function HeroCard({
   const delta = t.am != null && o.yesterday?.am != null ? t.am - o.yesterday.am : null;
   const total = t.budget + t.burn;
   const over = t.budget > 0 && t.remaining < 0;
-  const morning = new Date().getHours() < 14;
+  const morning = isMorning(new Date());
   return (
     <MCard>
       <div className="wt:flex wt:items-center wt:gap-3.5">

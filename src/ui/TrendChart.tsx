@@ -19,11 +19,14 @@ export function TrendChart({
   today,
   goal,
   showPm,
+  onBackfill,
 }: {
   days: readonly DaySummary[];
   today: string;
   goal: number | null;
   showPm: boolean;
+  /** 点没称晨重的那天时补记 */
+  onBackfill?(date: string): void;
 }) {
   const [ref, width] = useWidth<HTMLDivElement>();
   const [hover, setHover] = useState<number | null>(null);
@@ -165,6 +168,8 @@ export function TrendChart({
             fill="transparent"
             onPointerMove={onMove}
             onPointerLeave={() => setHover(null)}
+            onClick={() => h && h.am == null && onBackfill?.(h.date)}
+            className={h?.am == null && onBackfill ? "wt:cursor-pointer" : undefined}
           />
         </svg>
       )}
@@ -191,6 +196,7 @@ export function TrendChart({
             over={h.eat === "miss"}
           />
           <TipRow swatch={MOVE_COLOR} label="运动" value={`${h.moveMinutes} 分钟`} />
+          {h.am == null && onBackfill && <div className="wt:text-accent-text wt:mt-1 wt:text-[11.5px]">没称晨重 · 点一下补记</div>}
         </div>
       )}
     </div>
