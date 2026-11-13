@@ -161,7 +161,7 @@ export function MobileWeightPage({ params, pageContext }: PluginPageProps) {
         </div>
       </div>
       <WeighSheet target={weigh} onClose={() => setWeigh(null)} />
-      <EntrySheet entry={editing} onClose={() => setEditing(null)} />
+      <EntrySheet entry={editing} today={today} onClose={() => setEditing(null)} />
       <VoiceSheet request={voice} onClose={() => setVoice(null)} />
       {setup && (
         <Onboarding

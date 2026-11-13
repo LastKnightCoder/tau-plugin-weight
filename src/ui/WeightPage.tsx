@@ -132,6 +132,7 @@ export function WeightPage({ params }: PluginPageProps) {
                 </Card>
                 <TodayList
                   entries={todayEntries}
+                  today={today}
                   time={time}
                   remaining={t.budget > 0 ? t.remaining : null}
                   moveMinutes={t.moveMinutes}

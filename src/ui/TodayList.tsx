@@ -1,5 +1,5 @@
 /**
- * 今天的流水：按时间排列饮食与运动，可改热量、删除（删除给撤销）。
+ * 今天的流水：按时间排列饮食与运动，点行打开弹窗改一笔（含日期，可挪回昨天）、删除（删除给撤销）。
  * 末尾的占位行提示还没记的晚饭与还差的运动。
  */
 import { useState } from "react";
@@ -8,21 +8,25 @@ import { Footprints, Sparkles, Trash2, UtensilsCrossed } from "lucide-react";
 import { IconButton, toast } from "@tau/ui";
 import type { Entry } from "../data/model";
 import { WEIGHT_KEY, useRuntime } from "../runtime";
+import { EntryDialog } from "./EntryDialog";
 import { Card, CardHead, FOOD_COLOR, MOVE_COLOR } from "./bits";
 
 export function TodayList({
   entries,
+  today,
   time,
   remaining,
   moveMinutes,
   moveGoal,
 }: {
   entries: readonly Entry[];
+  today: string;
   time: string;
   remaining: number | null;
   moveMinutes: number;
   moveGoal: number;
 }) {
+  const [editing, setEditing] = useState<Entry | null>(null);
   const foods = entries.filter(e => e.kind === "food").length;
   const moves = entries.length - foods;
   const hasDinner = entries.some(e => e.kind === "food" && e.time >= "16:30");
@@ -31,7 +35,7 @@ export function TodayList({
       <CardHead title="今天" note={`${foods} 条饮食 · ${moves} 次运动`} />
       <div className="wt:flex wt:flex-col wt:px-2.5 wt:pt-1.5 wt:pb-3">
         {entries.map(entry => (
-          <Row key={entry.id} entry={entry} />
+          <Row key={entry.id} entry={entry} onEdit={() => setEditing(entry)} />
         ))}
         {!hasDinner && time < "21:30" && (
           <Placeholder kind="food" label="晚饭">
@@ -51,6 +55,7 @@ export function TodayList({
           <p className="wt:text-ink-3 wt:px-2 wt:pt-1 wt:text-[12px]">吃东西、运动之前，在上面写一句。</p>
         )}
       </div>
+      <EntryDialog entry={editing} today={today} onClose={() => setEditing(null)} />
     </Card>
   );
 }
@@ -82,25 +87,10 @@ function Placeholder({ kind, label, children }: { kind: Entry["kind"]; label: st
   );
 }
 
-function Row({ entry }: { entry: Entry }) {
+function Row({ entry, onEdit }: { entry: Entry; onEdit(): void }) {
   const { data, context, estimates } = useRuntime();
   const client = useQueryClient();
-  const [editing, setEditing] = useState<string | null>(null);
   const refresh = () => client.invalidateQueries({ queryKey: WEIGHT_KEY });
-
-  const saveKcal = async () => {
-    const value = editing?.trim() ? Number(editing) : NaN;
-    setEditing(null);
-    if (!Number.isFinite(value) || value < 0) return;
-    if (entry.estimate === "ready" && Math.round(value) === entry.kcal) return;
-    try {
-      await data.updateEntry(entry, { kcal: Math.round(value), estimate: "ready" });
-      if (entry.kind === "food") await data.rememberFood(entry.text, Math.round(value));
-      if (!context.signal.aborted) await refresh();
-    } catch {
-      toast.error("修改失败");
-    }
-  };
 
   const remove = async () => {
     try {
@@ -127,38 +117,27 @@ function Row({ entry }: { entry: Entry }) {
   return (
     <div className="wt:group wt:hover:bg-hover wt:grid wt:grid-cols-[22px_40px_minmax(0,1fr)_auto_26px] wt:items-center wt:gap-2 wt:rounded-[10px] wt:px-2 wt:py-[5px] wt:text-[12.5px]">
       <Icon kind={entry.kind} />
-      <span className="wt:text-ink-3 wt:text-[11px] wt:tabular-nums">{entry.time}</span>
-      <span className="wt:min-w-0 wt:truncate" title={entry.text}>
+      <button type="button" onClick={onEdit} title="修改" className="wt:text-ink-3 wt:text-left wt:text-[11px] wt:tabular-nums">
+        {entry.time}
+      </button>
+      <button type="button" onClick={onEdit} title="修改" className="wt:min-w-0 wt:truncate wt:text-left">
         {entry.text}
         {entry.kind === "move" && <span className="wt:text-ink-3"> · {entry.minutes} 分钟</span>}
-      </span>
-      {editing != null ? (
-        <input
-          autoFocus
-          value={editing}
-          inputMode="numeric"
-          onChange={e => setEditing(e.target.value.replace(/[^\d]/g, "").slice(0, 4))}
-          onBlur={() => void saveKcal()}
-          onKeyDown={e => {
-            if (e.nativeEvent.isComposing) return;
-            if (e.key === "Enter") void saveKcal();
-            if (e.key === "Escape") {
-              e.stopPropagation();
-              setEditing(null);
-            }
-          }}
-          aria-label="热量（千卡）"
-          className="wt:border-accent wt:w-[52px] wt:rounded-[6px] wt:border wt:bg-transparent wt:px-1.5 wt:text-right wt:tabular-nums wt:outline-none"
-        />
-      ) : entry.estimate === "pending" ? (
-        <span className="wt:text-ink-3 wt:inline-flex wt:items-center wt:gap-1 wt:px-1.5 wt:text-[11.5px]">
+      </button>
+      {entry.estimate === "pending" ? (
+        <button
+          type="button"
+          onClick={onEdit}
+          title="还在估算，点开先填"
+          className="wt:text-ink-3 wt:hover:text-ink-1 wt:inline-flex wt:items-center wt:gap-1 wt:px-1.5 wt:text-[11.5px]"
+        >
           <Sparkles className="wt:size-[11px]" strokeWidth={1.75} />
           估算中
-        </span>
+        </button>
       ) : entry.estimate === "failed" ? (
         <button
           type="button"
-          onClick={() => setEditing("")}
+          onClick={onEdit}
           className="wt:text-accent-text wt:bg-accent-soft wt:rounded-[6px] wt:px-1.5 wt:text-[11.5px] wt:font-medium"
         >
           填热量
@@ -166,8 +145,8 @@ function Row({ entry }: { entry: Entry }) {
       ) : (
         <button
           type="button"
-          onClick={() => setEditing(String(entry.kcal))}
-          title="修改热量"
+          onClick={onEdit}
+          title="修改"
           className={
             entry.kind === "move"
               ? "wt:text-ok wt:rounded-[6px] wt:px-1.5 wt:tabular-nums wt:hover:bg-press"
