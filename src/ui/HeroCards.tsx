@@ -57,10 +57,10 @@ function Slot({ icon, label, value, onClick }: { icon: ReactNode; label: string;
       )}
     >
       {icon}
-      <span className="wt:flex wt:flex-col wt:leading-[1.35]">
-        <span className="wt:text-ink-3 wt:text-[11px]">{label}</span>
+      <span className="wt:flex wt:min-w-0 wt:flex-col wt:overflow-hidden wt:leading-[1.35]">
+        <span className="wt:text-ink-3 wt:truncate wt:text-[11px]">{label}</span>
         {empty ? (
-          <span className="wt:text-[12.5px] wt:font-medium">＋ 记一下</span>
+          <span className="wt:whitespace-nowrap wt:text-[12.5px] wt:font-medium">＋ 记一下</span>
         ) : (
           <b className="wt:text-ink-1 wt:text-[14px] wt:font-semibold wt:tabular-nums">{kg(value)}</b>
         )}
