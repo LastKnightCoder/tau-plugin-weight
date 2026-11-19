@@ -1,7 +1,7 @@
 /**
  * 趋势图：上半区体重（晨重散点 + 7 日均值线 + 目标虚线，可叠睡前空心点），下半区每日摄入柱
  * （没超预算用饮食色、超了用中性灰，预算为虚线，运动达标在柱下打点）。两区各自一根纵轴、共用横轴，
- * 悬停时十字线贯穿两区并显示当天明细。
+ * 悬停时十字线贯穿两区并显示当天读数；点击选中日期，由页面展示当天流水。
  */
 import { useMemo, useState, type PointerEvent } from "react";
 import type { DaySummary } from "../data/stats";
@@ -17,16 +17,17 @@ const AXIS_H = 20;
 export function TrendChart({
   days,
   today,
+  selectedDate,
   goal,
   showPm,
-  onBackfill,
+  onSelectDate,
 }: {
   days: readonly DaySummary[];
   today: string;
+  selectedDate: string;
   goal: number | null;
   showPm: boolean;
-  /** 点没称晨重的那天时补记 */
-  onBackfill?(date: string): void;
+  onSelectDate(date: string): void;
 }) {
   const [ref, width] = useWidth<HTMLDivElement>();
   const [hover, setHover] = useState<number | null>(null);
@@ -66,13 +67,19 @@ export function TrendChart({
   const lastAvg = [...days.keys()].reverse().find(i => days[i].avg != null);
   const budget = days[days.length - 1].budget;
   const h = hover != null ? days[hover] : null;
+  const selected = days.findIndex(day => day.date === selectedDate);
 
-  const onMove = (event: PointerEvent<SVGRectElement>) => {
+  const indexAt = (event: { clientX: number; currentTarget: SVGRectElement }) => {
     const svg = event.currentTarget.ownerSVGElement;
-    if (!svg) return;
+    if (!svg) return null;
     const mx = event.clientX - svg.getBoundingClientRect().left - PAD_L;
     const index = days.length === 1 ? 0 : Math.round((mx / plotW) * (days.length - 1));
-    setHover(Math.min(days.length - 1, Math.max(0, index)));
+    return Math.min(days.length - 1, Math.max(0, index));
+  };
+
+  const onMove = (event: PointerEvent<SVGRectElement>) => {
+    const index = indexAt(event);
+    if (index != null) setHover(index);
   };
 
   return (
@@ -154,7 +161,10 @@ export function TrendChart({
               </text>
             ) : null
           )}
-          {hover != null && (
+          {selected >= 0 && (
+            <line x1={x(selected)} x2={x(selected)} y1={4} y2={yk(0)} stroke="var(--tau-accent)" strokeWidth={1.2} opacity={0.65} />
+          )}
+          {hover != null && hover !== selected && (
             <line x1={x(hover)} x2={x(hover)} y1={4} y2={yk(0)} stroke="var(--tau-ink-2)" opacity={0.35} />
           )}
           {h?.avg != null && hover != null && (
@@ -168,8 +178,11 @@ export function TrendChart({
             fill="transparent"
             onPointerMove={onMove}
             onPointerLeave={() => setHover(null)}
-            onClick={() => h && h.am == null && onBackfill?.(h.date)}
-            className={h?.am == null && onBackfill ? "wt:cursor-pointer" : undefined}
+            onClick={event => {
+              const index = indexAt(event);
+              if (index != null) onSelectDate(days[index].date);
+            }}
+            className="wt:cursor-pointer"
           />
         </svg>
       )}
@@ -196,7 +209,9 @@ export function TrendChart({
             over={h.eat === "miss"}
           />
           <TipRow swatch={MOVE_COLOR} label="运动" value={`${h.moveMinutes} 分钟`} />
-          {h.am == null && onBackfill && <div className="wt:text-accent-text wt:mt-1 wt:text-[11.5px]">没称晨重 · 点一下补记</div>}
+          <div className="wt:text-accent-text wt:mt-1 wt:text-[11.5px]">
+            {h.am == null ? "没称晨重 · " : ""}点击查看当天记录
+          </div>
         </div>
       )}
     </div>

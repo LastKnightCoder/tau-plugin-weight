@@ -1,6 +1,6 @@
 /**
  * 减重主页：整页一张纸，标题固定在纸顶、内容在纸内滚动，纸内卡片用细描边。
- * 上部两列，左列三张今日卡与体重 + 摄入趋势，右列一句话记录、今天流水与 AI（AI 卡拉伸到与左列等高）；下部通栏是打卡格与四组对比。宽度不足时右列落到左列下方。参数 weigh: "am" | "pm" 打开称重弹窗（首页卡片跳转用）。
+ * 上部两列，左列三张今日卡与体重 + 摄入趋势，右列选日记录、每日流水与 AI（AI 仍分析今天，卡拉伸到与左列等高）；下部通栏是打卡格与四组对比。宽度不足时右列落到左列下方。参数 weigh: "am" | "pm" 打开称重弹窗（首页卡片跳转用）。
  */
 import { useEffect, useMemo, useRef, useState } from "react";
 import type { PluginPageProps } from "@tau/plugins";
@@ -12,8 +12,8 @@ import { Card, CardHead, FOOD_COLOR, MOVE_COLOR, dayLabel } from "./bits";
 import { BudgetCard, MoveCard, WeightCard } from "./HeroCards";
 import { GroupCompare, HabitGrid } from "./Insights";
 import { QuickLog } from "./QuickLog";
-import { useLedger, useNow } from "./queries";
-import { TodayList } from "./TodayList";
+import { useDayEntries, useLedger, useNow } from "./queries";
+import { DayList } from "./DayList";
 import { TrendChart } from "./TrendChart";
 import { WeighDialog, type WeighDialogState } from "./WeighDialog";
 import { defaultWeigh } from "./weighing";
@@ -27,11 +27,19 @@ export function WeightPage({ params }: PluginPageProps) {
   const { today, time } = useNow();
   const query = useLedger(LEDGER_DAYS, today);
   const [range, setRange] = useState<Range>("30");
+  const [pickedDate, setPickedDate] = useState<string | null>(null);
+  const selectedDate = pickedDate ?? today;
+  const selectedDayQuery = useDayEntries(selectedDate);
   const [showPm, setShowPm] = useState(false);
   const [weigh, setWeigh] = useState<WeighDialogState | null>(null);
   const logRef = useRef<HTMLDivElement>(null);
 
-  /** 不带日期时按当前时间定（凌晨归到昨天睡前）；趋势图补空缺时带上日期 */
+  const selectDate = (date: string) => {
+    if (date > today) return;
+    setPickedDate(current => current === date || date === today ? null : date);
+  };
+
+  /** 不带日期时按当前时间定（凌晨归到昨天睡前）；日详情补空缺时带上日期 */
   const openWeigh = (slot?: WeighSlot, date?: string) => {
     const ledger = query.data?.ledger;
     if (!ledger) return;
@@ -65,6 +73,13 @@ export function WeightPage({ params }: PluginPageProps) {
   const t = o.today;
   const moveGoal = profile?.moveGoal ?? 30;
   const focusLog = () => logRef.current?.querySelector("input")?.focus();
+  const focusTodayLog = () => {
+    selectDate(today);
+    focusLog();
+  };
+  const selectedDay = ledger.byDate.get(selectedDate) ?? null;
+  const selectedIsToday = selectedDate === today;
+  const selectedRemaining = selectedDay && selectedDay.budget > 0 ? selectedDay.remaining : null;
   const stamp = `${todayEntries.map(e => `${e.id}:${e.kcal}`).join(",")}|${t.am}|${t.pm}`;
 
   return (
@@ -79,7 +94,7 @@ export function WeightPage({ params }: PluginPageProps) {
               <div className="wt:flex wt:min-w-0 wt:flex-col wt:gap-3.5">
                 <div className="wt:grid wt:grid-cols-1 wt:gap-3.5 wt:@[640px]:grid-cols-[1.1fr_1.25fr_1fr]">
                   <WeightCard o={o} onWeigh={slot => openWeigh(slot)} />
-                  <BudgetCard o={o} hasProfile={profile != null} onFocusLog={focusLog} onSetup={() => void pages.settings?.open()} />
+                  <BudgetCard o={o} hasProfile={profile != null} onFocusLog={focusTodayLog} onSetup={() => void pages.settings?.open()} />
                   <MoveCard o={o} moveGoal={moveGoal} />
                 </div>
 
@@ -100,9 +115,10 @@ export function WeightPage({ params }: PluginPageProps) {
                       <TrendChart
                         days={chartDays}
                         today={today}
+                        selectedDate={selectedDate}
                         goal={profile?.goalKg ?? null}
                         showPm={showPm}
-                        onBackfill={date => openWeigh("am", date)}
+                        onSelectDate={selectDate}
                       />
                     ) : (
                       <p className="wt:text-ink-3 wt:grid wt:h-[200px] wt:place-items-center wt:text-[12.5px]">
@@ -118,26 +134,38 @@ export function WeightPage({ params }: PluginPageProps) {
               <div className="wt:flex wt:min-w-0 wt:flex-col wt:gap-3.5">
                 <Card className="wt:px-4 wt:pt-3.5 wt:pb-3">
                   <div className="wt:text-ink-3 wt:mb-2.5 wt:flex wt:items-center wt:text-[12px]">
-                    一句话记录
+                    {selectedIsToday ? "一句话记录" : `补记到 ${dayLabel(selectedDate)}`}
                     <span className="wt:flex-1" />
-                    {dayLabel(today)} {time}
+                    {selectedIsToday ? (
+                      time
+                    ) : (
+                      <button type="button" onClick={() => selectDate(today)} className="wt:text-accent-text wt:font-medium">
+                        回到今天
+                      </button>
+                    )}
                   </div>
                   <div ref={logRef}>
                     <QuickLog
-                      remaining={t.budget > 0 ? t.remaining : null}
+                      date={selectedIsToday ? undefined : selectedDate}
+                      remaining={selectedRemaining}
                       kg={o.latestAvg}
                       hasProfile={profile != null}
                       examples={EXAMPLES}
                     />
                   </div>
                 </Card>
-                <TodayList
-                  entries={todayEntries}
+                <DayList
+                  entries={selectedDayQuery.data ?? []}
+                  date={selectedDate}
                   today={today}
                   time={time}
-                  remaining={t.budget > 0 ? t.remaining : null}
-                  moveMinutes={t.moveMinutes}
+                  day={selectedDay}
+                  loading={selectedDayQuery.isPending}
+                  error={selectedDayQuery.isError}
                   moveGoal={moveGoal}
+                  onFocusLog={focusLog}
+                  onWeigh={() => openWeigh("am", selectedDate)}
+                  onRetry={() => void selectedDayQuery.refetch()}
                 />
                 <AIPanel
                   className="wt:flex-1"
@@ -147,7 +175,14 @@ export function WeightPage({ params }: PluginPageProps) {
               </div>
             </div>
             <div className="wt:mt-3.5 wt:grid wt:grid-cols-1 wt:gap-3.5 wt:@[760px]:grid-cols-2">
-              <HabitGrid ledger={ledger} today={today} budgetKnown={profile != null} moveGoal={moveGoal} />
+              <HabitGrid
+                ledger={ledger}
+                today={today}
+                selectedDate={selectedDate}
+                budgetKnown={profile != null}
+                moveGoal={moveGoal}
+                onSelectDate={selectDate}
+              />
               <GroupCompare days={ledger.days} />
             </div>
           </div>

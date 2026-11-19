@@ -1,7 +1,7 @@
 /**
- * 打卡格（最近 8 周，周一开头，每天两颗点 = 少吃 / 多动）与「做到了，第二天轻多少」四组对比。
+ * 打卡格（最近 8 周，周一开头，每天两颗点 = 少吃 / 多动，点格选择当天）与「做到了，第二天轻多少」四组对比。
  */
-import { Tooltip } from "@tau/ui";
+import { Tooltip, cn } from "@tau/ui";
 import { addDays } from "../data/model";
 import { compareGroups, type DaySummary, type GroupStat, type Ledger } from "../data/stats";
 import { Card, CardHead, Delta, Dot, FOOD_COLOR, GAIN_COLOR, LOSE_COLOR, MOVE_COLOR, dayLabel, shortDate } from "./bits";
@@ -9,18 +9,20 @@ import { Card, CardHead, Delta, Dot, FOOD_COLOR, GAIN_COLOR, LOSE_COLOR, MOVE_CO
 const WEEKS = 8;
 const MIN_SAMPLE = 5;
 
-export function HabitGrid({ ledger, today, budgetKnown, moveGoal }: {
+export function HabitGrid({ ledger, today, selectedDate, budgetKnown, moveGoal, onSelectDate }: {
   ledger: Ledger;
   today: string;
+  selectedDate: string;
   budgetKnown: boolean;
   moveGoal: number;
+  onSelectDate(date: string): void;
 }) {
   const weekday = (new Date(`${today}T00:00:00`).getDay() + 6) % 7;
   const firstMonday = addDays(today, -weekday - (WEEKS - 1) * 7);
   const rows = Array.from({ length: WEEKS }, (_, w) => addDays(firstMonday, w * 7));
   return (
     <Card>
-      <CardHead title="打卡" note="由记录自动判定" />
+      <CardHead title="打卡" note="由记录自动判定 · 点一天看记录" />
       <div className="wt:px-[18px] wt:pt-2.5 wt:pb-4">
         <div className="wt:grid wt:grid-cols-[48px_repeat(7,minmax(0,1fr))] wt:items-center wt:gap-1">
           <span />
@@ -30,7 +32,14 @@ export function HabitGrid({ ledger, today, budgetKnown, moveGoal }: {
             </span>
           ))}
           {rows.map(monday => (
-            <Week key={monday} monday={monday} ledger={ledger} today={today} />
+            <Week
+              key={monday}
+              monday={monday}
+              ledger={ledger}
+              today={today}
+              selectedDate={selectedDate}
+              onSelectDate={onSelectDate}
+            />
           ))}
         </div>
         <div className="wt:text-ink-3 wt:mt-2.5 wt:flex wt:flex-wrap wt:gap-x-3 wt:gap-y-1 wt:text-[11px]">
@@ -52,7 +61,13 @@ export function HabitGrid({ ledger, today, budgetKnown, moveGoal }: {
   );
 }
 
-function Week({ monday, ledger, today }: { monday: string; ledger: Ledger; today: string }) {
+function Week({ monday, ledger, today, selectedDate, onSelectDate }: {
+  monday: string;
+  ledger: Ledger;
+  today: string;
+  selectedDate: string;
+  onSelectDate(date: string): void;
+}) {
   return (
     <>
       <span className="wt:text-ink-3 wt:text-[10.5px] wt:tabular-nums">{shortDate(monday)}</span>
@@ -61,13 +76,21 @@ function Week({ monday, ledger, today }: { monday: string; ledger: Ledger; today
         const day = ledger.byDate.get(date);
         if (!day || date > today)
           return <span key={date} className="wt:h-[26px] wt:rounded-[7px] wt:shadow-[inset_0_0_0_1px_var(--tau-line-2)]" />;
-        return <Cell key={date} day={day} isToday={date === today} />;
+        return (
+          <Cell
+            key={date}
+            day={day}
+            isToday={date === today}
+            selected={date === selectedDate}
+            onSelect={() => onSelectDate(date)}
+          />
+        );
       })}
     </>
   );
 }
 
-function Cell({ day, isToday }: { day: DaySummary; isToday: boolean }) {
+function Cell({ day, isToday, selected, onSelect }: { day: DaySummary; isToday: boolean; selected: boolean; onSelect(): void }) {
   const eatText = day.eat === "ok" ? "没超预算" : day.eat === "miss" ? `超出 ${-day.remaining} kcal` : day.foodCount ? "还在记" : "饮食没记";
   return (
     <Tooltip
@@ -77,14 +100,20 @@ function Cell({ day, isToday }: { day: DaySummary; isToday: boolean }) {
         </span>
       }
     >
-      <span
-        tabIndex={0}
-        className="wt:bg-hover wt:hover:bg-press wt:flex wt:h-[26px] wt:items-center wt:justify-center wt:gap-[3px] wt:rounded-[7px] wt:outline-none wt:focus-visible:shadow-[var(--tau-focus-ring)]"
-        style={isToday ? { boxShadow: "0 0 0 1.5px var(--tau-ink-1)" } : undefined}
+      <button
+        type="button"
+        aria-label={`${dayLabel(day.date)}，${eatText}，运动 ${day.moveMinutes} 分钟`}
+        aria-pressed={selected}
+        onClick={onSelect}
+        className={cn(
+          "wt:bg-hover wt:hover:bg-press wt:flex wt:h-[26px] wt:items-center wt:justify-center wt:gap-[3px] wt:rounded-[7px] wt:outline-none wt:focus-visible:shadow-[var(--tau-focus-ring)]",
+          selected && "wt:bg-press"
+        )}
+        style={selected ? { boxShadow: "0 0 0 1.5px var(--tau-accent)" } : isToday ? { boxShadow: "0 0 0 1.5px var(--tau-ink-1)" } : undefined}
       >
         <Dot color={FOOD_COLOR} filled={day.eat === "ok"} />
         <Dot color={MOVE_COLOR} filled={day.move === "ok"} />
-      </span>
+      </button>
     </Tooltip>
   );
 }

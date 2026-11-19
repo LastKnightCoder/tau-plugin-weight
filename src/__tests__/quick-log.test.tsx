@@ -95,4 +95,31 @@ describe("一句话记录的提交时间", () => {
       });
     }
   );
+
+  it("历史补录使用选中的日期和提交时的当前时间", async () => {
+    vi.setSystemTime(new Date(2026, 9, 31, 20, 28));
+    await act(async () => {
+      root.render(<QuickLog remaining={500} kg={77} hasProfile date="2026-09-01" />);
+    });
+    const input = container.querySelector<HTMLInputElement>('input[aria-label^="补记"]')!;
+    await act(async () => {
+      Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, "value")!.set!.call(input, "散步半小时");
+      input.dispatchEvent(new Event("input", { bubbles: true }));
+    });
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(700);
+    });
+    await act(async () => {
+      container.querySelector<HTMLButtonElement>('button[aria-label="记下"]')!.click();
+    });
+    expect(addEntry).toHaveBeenCalledWith({
+      date: "2026-09-01",
+      time: "20:28",
+      kind: "move",
+      text: "散步半小时",
+      kcal: 95,
+      minutes: 30,
+      estimate: "ready",
+    });
+  });
 });

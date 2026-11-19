@@ -62,6 +62,14 @@ export function useLedger(days: number, today: string) {
   });
 }
 
+export function useDayEntries(date: string) {
+  const { data } = useRuntime();
+  return useQuery({
+    queryKey: [...WEIGHT_KEY, "entries", date],
+    queryFn: () => data.listEntries(date, date),
+  });
+}
+
 export function useFoods() {
   const { data } = useRuntime();
   return useQuery({ queryKey: [...WEIGHT_KEY, "foods"], queryFn: () => data.getFoods() });

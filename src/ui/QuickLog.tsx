@@ -1,5 +1,5 @@
 /**
- * 一句话记录：输入「奶茶一杯」「跑步 30 分钟」，停顿后估算热量并预览记下后的余额，回车记入今天。
+ * 一句话记录：输入「奶茶一杯」「跑步 30 分钟」，停顿后估算热量并预览记下后的余额，回车记入指定日期（默认今天）。
  * 热量依次取常吃记忆 → AI 估算；估算失败或不满意时直接改数字，改过的数字会被记住。
  * 页面与首页卡片共用。
  */
@@ -11,7 +11,7 @@ import { aiErrorMessage, needsSetup } from "../ai";
 import { dateKey, timeKey } from "../data/model";
 import { fromMemory, type Draft } from "../data/parse";
 import { WEIGHT_KEY, useRuntime } from "../runtime";
-import { FOOD_COLOR, MOVE_COLOR } from "./bits";
+import { FOOD_COLOR, MOVE_COLOR, dayLabel } from "./bits";
 import { useFoods } from "./queries";
 
 const DEBOUNCE = 700;
@@ -22,6 +22,7 @@ export function QuickLog({
   hasProfile,
   examples = [],
   autoFocus,
+  date,
 }: {
   /** 当前余额；没填身体数据时为 null，只显示热量 */
   remaining: number | null;
@@ -29,6 +30,8 @@ export function QuickLog({
   hasProfile: boolean;
   examples?: readonly string[];
   autoFocus?: boolean;
+  /** 历史补录日期；缺省仍在提交时取当前本地日期 */
+  date?: string;
 }) {
   const { data, ai, context, estimates } = useRuntime();
   const client = useQueryClient();
@@ -97,7 +100,7 @@ export function QuickLog({
     try {
       const now = new Date();
       const entry = await data.addEntry({
-        date: dateKey(now),
+        date: date ?? dateKey(now),
         time: timeKey(now),
         kind: draft.kind,
         text: draft.text,
@@ -109,7 +112,8 @@ export function QuickLog({
         await data.rememberFood(draft.text, kcal);
       if (!valid) void estimates.enqueue(entry);
       if (context.signal.aborted) return;
-      toast.success(valid ? `已记下 ${draft.text}` : `已记下 ${draft.text}，热量在后台估算`);
+      const saved = date ? `已补到 ${dayLabel(date)}：${draft.text}` : `已记下 ${draft.text}`;
+      toast.success(valid ? saved : `${saved}，热量在后台估算`);
       setText("");
       await client.invalidateQueries({ queryKey: WEIGHT_KEY });
       inputRef.current?.focus();
@@ -140,8 +144,8 @@ export function QuickLog({
               setText("");
             }
           }}
-          placeholder="吃之前先写下来：奶茶一杯 / 跑步 30 分钟"
-          aria-label="一句话记录饮食或运动"
+          placeholder={date ? "补记饮食或运动：午饭牛肉面 / 散步 30 分钟" : "吃之前先写下来：奶茶一杯 / 跑步 30 分钟"}
+          aria-label={date ? `补记 ${dayLabel(date)} 的饮食或运动` : "一句话记录饮食或运动"}
           className="wt:text-tau-body wt:placeholder:text-ink-3 wt:min-w-0 wt:flex-1 wt:bg-transparent wt:outline-none"
         />
         <IconButton aria-label="记下" disabled={!canSubmit || saving} onClick={() => void submit()}>
