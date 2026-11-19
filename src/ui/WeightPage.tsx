@@ -5,7 +5,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import type { PluginPageProps } from "@tau/plugins";
 import { FadeScroll, Loading, Segmented } from "@tau/ui";
-import { addDays, type WeighSlot } from "../data/model";
+import { addDays, dateKey, type WeighSlot } from "../data/model";
 import { useRuntime } from "../runtime";
 import { AIPanel } from "./AIPanel";
 import { Card, CardHead, FOOD_COLOR, MOVE_COLOR, dayLabel } from "./bits";
@@ -35,8 +35,9 @@ export function WeightPage({ params }: PluginPageProps) {
   const openWeigh = (slot?: WeighSlot, date?: string) => {
     const ledger = query.data?.ledger;
     if (!ledger) return;
-    const target = date && slot ? { date, slot } : defaultWeigh(new Date(), ledger, slot);
-    setWeigh({ ...target, today, ledger });
+    const now = new Date();
+    const target = date && slot ? { date, slot } : defaultWeigh(now, ledger, slot);
+    setWeigh({ ...target, today: dateKey(now), ledger });
   };
 
   // 带 weigh 参数进入（首页卡片、命令）时打开称重，随后去掉参数，再次进入同一参数仍会触发；auto 按当前时间定时段

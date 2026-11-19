@@ -7,6 +7,7 @@ import { useQueryClient } from "@tanstack/react-query";
 import { Sparkles, X } from "lucide-react";
 import { cn, toast } from "@tau/ui";
 import { aiErrorMessage } from "../../ai";
+import { dateKey, timeKey } from "../../data/model";
 import { splitSpeech, type OrganizedItem } from "../../data/parse";
 import { useRuntime } from "../../runtime";
 import { addEntries } from "./actions";
@@ -15,7 +16,6 @@ import { Sheet } from "./Sheet";
 
 export interface VoiceRequest {
   text: string;
-  today: string;
   now: string;
   remaining: number | null;
   moveMinutes: number;
@@ -65,12 +65,13 @@ export function VoiceSheet({ request, onClose }: { request: VoiceRequest | null;
     if (!request || !items.length || saving) return;
     setSaving(true);
     try {
+      const now = new Date();
       await addEntries(
         runtime,
         client,
         items.map(item => ({
-          date: request.today,
-          time: item.time ?? request.now,
+          date: dateKey(now),
+          time: item.time ?? timeKey(now),
           kind: item.kind,
           text: item.text,
           // 整理中就记下时热量都还没有，后台估算

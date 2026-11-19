@@ -6,7 +6,7 @@ import { useState, type ReactNode } from "react";
 import { useQueryClient } from "@tanstack/react-query";
 import { ChartLine, ChevronLeft, Flame, Scale, Sunrise, UtensilsCrossed } from "lucide-react";
 import { cn, toast } from "@tau/ui";
-import { ACTIVITY_LEVELS, type Sex } from "../../data/model";
+import { ACTIVITY_LEVELS, dateKey, type Sex } from "../../data/model";
 import { dailyBudget, dailyBurn } from "../../data/stats";
 import { WEIGHT_KEY, useRuntime } from "../../runtime";
 import { toDraft, validate, type Draft } from "../SettingsForm";
@@ -56,7 +56,7 @@ export function Onboarding({
     try {
       await data.saveProfile(profile);
       // 「现在体重」当作今天的晨重；今天已经称过就不覆盖
-      if (kgValid && latestKg == null) await data.saveWeigh(today, "am", kgValue);
+      if (kgValid && latestKg == null) await data.saveWeigh(dateKey(new Date()), "am", kgValue);
       await client.invalidateQueries({ queryKey: WEIGHT_KEY });
       return true;
     } catch {

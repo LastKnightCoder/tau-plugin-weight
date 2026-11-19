@@ -7,7 +7,7 @@ import { useQueryClient } from "@tanstack/react-query";
 import { ArrowUp, History, Mic, Sparkles } from "lucide-react";
 import { cn, toast } from "@tau/ui";
 import { classify, fromMemory } from "../../data/parse";
-import { foodKey } from "../../data/model";
+import { dateKey, foodKey, timeKey } from "../../data/model";
 import { useRuntime } from "../../runtime";
 import { FOOD_COLOR } from "../bits";
 import { useFoods } from "../queries";
@@ -27,16 +27,12 @@ function recentFoods(foods: Record<string, number>, limit = 8) {
 
 export function LogBar({
   ref,
-  today,
-  time,
   remaining,
   eaten,
   onVoice,
   chips = true,
 }: {
   ref?: Ref<LogBarHandle>;
-  today: string;
-  time: string;
   /** 当前余额；没填身体数据时为 null */
   remaining: number | null;
   eaten: number;
@@ -86,8 +82,9 @@ export function LogBar({
     const label = manualKcal != null && value === text ? base.text.replace(typed![0], "").trim() || base.text : base.text;
     setSaving(true);
     try {
+      const now = new Date();
       const [entry] = await addEntries(runtime, client, [
-        { date: today, time, kind: base.kind, text: label, kcal: presetKcal, minutes: base.kind === "move" ? base.minutes : 0 },
+        { date: dateKey(now), time: timeKey(now), kind: base.kind, text: label, kcal: presetKcal, minutes: base.kind === "move" ? base.minutes : 0 },
       ]);
       if (presetKcal != null && base.kind === "food" && presetKcal !== memoryKcal)
         await runtime.data.rememberFood(label, presetKcal);

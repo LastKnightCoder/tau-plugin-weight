@@ -7,7 +7,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import type { PluginPageProps } from "@tau/plugins";
 import { Loading } from "@tau/ui";
 import { compareGroups } from "../../data/stats";
-import type { Entry, WeighSlot } from "../../data/model";
+import { dateKey, timeKey, type Entry, type WeighSlot } from "../../data/model";
 import { useRuntime } from "../../runtime";
 import { useLedger, useNow, usePrefs } from "../queries";
 import { defaultWeigh } from "../weighing";
@@ -66,8 +66,9 @@ export function MobileWeightPage({ params, pageContext }: PluginPageProps) {
   const openWeigh = (slot?: WeighSlot, date?: string) => {
     const ledger = query.data?.ledger;
     if (!ledger) return;
-    const target = date && slot ? { date, slot } : defaultWeigh(new Date(), ledger, slot);
-    setWeigh({ ...target, today, ledger, avg: query.data?.overview.latestAvg ?? null });
+    const now = new Date();
+    const target = date && slot ? { date, slot } : defaultWeigh(now, ledger, slot);
+    setWeigh({ ...target, today: dateKey(now), ledger, avg: query.data?.overview.latestAvg ?? null });
   };
 
   // 带参数进入（今天页卡片、命令）时执行一次，随后去掉参数，再次进入同一参数仍会触发；auto 按当前时间定时段
@@ -142,15 +143,12 @@ export function MobileWeightPage({ params, pageContext }: PluginPageProps) {
         <div className="wt:sticky wt:bottom-0 wt:z-[2]">
           <LogBar
             ref={logRef}
-            today={today}
-            time={time}
             remaining={remaining}
             eaten={t.intake}
             onVoice={text =>
               setVoice({
                 text,
-                today,
-                now: time,
+                now: timeKey(new Date()),
                 remaining,
                 moveMinutes: t.moveMinutes,
                 moveGoal,

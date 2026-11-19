@@ -6,6 +6,7 @@ import { useState } from "react";
 import type { PluginHomePanelProps } from "@tau/plugins";
 import { Plus, Scale } from "lucide-react";
 import { cn } from "@tau/ui";
+import { dateKey } from "../../data/model";
 import { useRuntime } from "../../runtime";
 import { kg, signed } from "../bits";
 import { useLedger, useNow, usePrefs } from "../queries";
@@ -29,8 +30,10 @@ export function MobileHomePanel({ registerDismiss }: PluginHomePanelProps) {
 
   // 凌晨不指定时段，由 defaultWeigh 归到昨天睡前
   const openWeigh = () => {
+    const now = new Date();
+    const morning = isMorning(now);
     const slot = isLateNight(now) ? undefined : morning || t.am == null ? "am" : "pm";
-    setWeigh({ ...defaultWeigh(new Date(), ledger, slot), today, ledger, avg: o.latestAvg });
+    setWeigh({ ...defaultWeigh(now, ledger, slot), today: dateKey(now), ledger, avg: o.latestAvg });
   };
 
   const button = "wt:flex wt:h-8 wt:flex-1 wt:items-center wt:justify-center wt:gap-1 wt:rounded-[10px] wt:text-[12px] wt:font-semibold wt:[&>svg]:size-[13px]";
