@@ -71,17 +71,18 @@ export function MobileWeightPage({ params, pageContext }: PluginPageProps) {
     setWeigh({ ...target, today: dateKey(now), ledger, avg: query.data?.overview.latestAvg ?? null });
   };
 
-  // 带参数进入（今天页卡片、命令）时执行一次，随后去掉参数，再次进入同一参数仍会触发；auto 按当前时间定时段
+  // 每次打开都有新的页面实例；在实例内消费入口动作，保活恢复时保留草稿。
   const weighParam = params.weigh === "am" || params.weigh === "pm" || params.weigh === "auto" ? params.weigh : null;
   const logParam = params.log === true || params.log === "1";
+  const handledEntry = useRef(false);
   const latestOpen = useRef(openWeigh);
   latestOpen.current = openWeigh;
   useEffect(() => {
-    if (!ready || (!weighParam && !logParam)) return;
+    if (!ready || handledEntry.current || (!weighParam && !logParam)) return;
+    handledEntry.current = true;
     if (weighParam) latestOpen.current(weighParam === "auto" ? undefined : weighParam);
     if (logParam) logRef.current?.fill("");
-    void pages.main?.open({});
-  }, [weighParam, logParam, ready, pages]);
+  }, [weighParam, logParam, ready]);
 
   const stamp = useMemo(() => {
     const d = query.data;
