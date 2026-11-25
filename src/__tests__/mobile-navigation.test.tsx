@@ -58,12 +58,13 @@ it("今天页记一笔只打开一次减重页，保活恢复后保留输入的�
     await act(async () => log.click());
     expect(open).toHaveBeenCalledTimes(1);
     const params = open.mock.calls[0][0]!;
+    const pageProps = { context, params, pageContext, placement: "page" as const };
     const showPage = async (mode: "visible" | "hidden") =>
       act(async () =>
         root.render(
           <RuntimeProvider runtime={runtime}>
             <Activity mode={mode}>
-              <MobileWeightPage context={context} params={params} pageContext={pageContext} />
+              <MobileWeightPage {...pageProps} />
             </Activity>
           </RuntimeProvider>
         )
