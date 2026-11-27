@@ -4,10 +4,12 @@
  */
 import { useEffect, useState } from "react";
 import { useQueryClient } from "@tanstack/react-query";
+import { useI18n } from "@tau/plugins";
 import { ChevronRight, Trash2 } from "lucide-react";
 import { toast } from "@tau/ui";
 import type { Entry } from "../../data/model";
 import { WEIGHT_KEY, useRuntime } from "../../runtime";
+import { messages } from "../../i18n";
 import { relativeDay } from "../weighing";
 import { PrimaryButton, Stepper } from "./parts";
 import { Sheet } from "./Sheet";
@@ -17,6 +19,7 @@ const FIELD = "wt:flex wt:min-h-[50px] wt:items-center wt:gap-2.5 wt:text-[14.5p
 
 export function EntrySheet({ entry, today, onClose }: { entry: Entry | null; today: string; onClose(): void }) {
   const runtime = useRuntime();
+  const { t } = useI18n(messages);
   const client = useQueryClient();
   const [text, setText] = useState("");
   const [time, setTime] = useState("");
@@ -52,7 +55,7 @@ export function EntrySheet({ entry, today, onClose }: { entry: Entry | null; tod
       await client.invalidateQueries({ queryKey: WEIGHT_KEY });
       onClose();
     } catch {
-      toast.error("修改失败");
+      toast.error(t("common.updateFailed"));
     } finally {
       setSaving(false);
     }
@@ -62,15 +65,15 @@ export function EntrySheet({ entry, today, onClose }: { entry: Entry | null; tod
     <Sheet
       open={entry != null}
       onClose={onClose}
-      title={unsettled ? "填热量" : "改一笔"}
+      title={unsettled ? t("dl.fillKcal") : t("es.title")}
       trailing={
         entry ? (
           <button
             type="button"
-            aria-label="删除这一笔"
+            aria-label={t("es.deleteAria")}
             onClick={() => {
               onClose();
-              void removeWithUndo(runtime, client, entry);
+              void removeWithUndo(runtime, client, entry, t);
             }}
             className="wt:text-danger wt:grid wt:size-8 wt:place-items-center"
           >
@@ -81,7 +84,7 @@ export function EntrySheet({ entry, today, onClose }: { entry: Entry | null; tod
     >
       <div className="wt:mt-1.5 wt:divide-y wt:divide-line-2">
         <label className={FIELD}>
-          <span className="wt:text-ink-3 wt:w-11 wt:shrink-0">内容</span>
+          <span className="wt:text-ink-3 wt:w-11 wt:shrink-0">{t("es.content")}</span>
           <input
             value={text}
             onChange={e => setText(e.target.value.slice(0, 60))}
@@ -89,7 +92,7 @@ export function EntrySheet({ entry, today, onClose }: { entry: Entry | null; tod
           />
         </label>
         <label className={FIELD}>
-          <span className="wt:text-ink-3 wt:w-11 wt:shrink-0">时间</span>
+          <span className="wt:text-ink-3 wt:w-11 wt:shrink-0">{t("es.time")}</span>
           <input
             type="time"
             value={time}
@@ -98,46 +101,46 @@ export function EntrySheet({ entry, today, onClose }: { entry: Entry | null; tod
           />
         </label>
         <label className={FIELD}>
-          <span className="wt:text-ink-3 wt:w-11 wt:shrink-0">日期</span>
+          <span className="wt:text-ink-3 wt:w-11 wt:shrink-0">{t("es.date")}</span>
           <span className="wt:relative wt:flex wt:flex-1 wt:items-center wt:gap-1">
-            {date ? relativeDay(date, today) : ""}
+            {date ? relativeDay(t, date, today) : ""}
             <ChevronRight className="wt:text-ink-3 wt:ml-auto wt:size-4" />
             <input
               type="date"
               value={date}
               max={today}
               onChange={e => e.target.value && e.target.value <= today && setDate(e.target.value)}
-              aria-label="日期"
+              aria-label={t("es.date")}
               className="wt:absolute wt:inset-0 wt:opacity-0"
             />
           </span>
         </label>
         {entry?.kind === "move" && (
           <div className={FIELD}>
-            <span className="wt:text-ink-3 wt:w-11 wt:shrink-0">时长</span>
+            <span className="wt:text-ink-3 wt:w-11 wt:shrink-0">{t("es.duration")}</span>
             <span className="wt:flex-1" />
-            <Stepper value={minutes} onChange={setMinutes} step={5} unit="分钟" label="运动时长" />
+            <Stepper value={minutes} onChange={setMinutes} step={5} unit={t("unit.minutes")} label={t("es.moveAria")} />
           </div>
         )}
         <div className={FIELD}>
-          <span className="wt:text-ink-3 wt:w-11 wt:shrink-0">{entry?.kind === "move" ? "消耗" : "热量"}</span>
+          <span className="wt:text-ink-3 wt:w-11 wt:shrink-0">{entry?.kind === "move" ? t("ql.burnLabel") : t("mlb.kcalLabel")}</span>
           <span className="wt:flex-1" />
           <Stepper value={kcal} onChange={setKcal} label="热量" />
         </div>
       </div>
       <p className="wt:text-ink-3 wt:px-1 wt:pt-1.5 wt:text-[11.5px] wt:leading-[1.6]">
         {entry?.estimate === "failed"
-          ? "AI 没估算出来，填一个大概的数就行。"
+          ? t("es.failedHint")
           : entry?.kind === "food"
-            ? `改过的数字会记进常吃，下次写「${text.trim() || "这个"}」直接用。`
-            : "运动消耗会加回当天还能吃的热量。"}
+            ? t("es.foodHint", { text: text.trim() || t("es.thisOne") })
+            : t("es.moveHint")}
       </p>
       <PrimaryButton
         className="wt:mt-3.5"
         disabled={!text.trim() || !/^\d{4}-\d{2}-\d{2}$/.test(date) || date > today || saving}
         onClick={() => void save()}
       >
-        保存
+        {t("common.save")}
       </PrimaryButton>
     </Sheet>
   );

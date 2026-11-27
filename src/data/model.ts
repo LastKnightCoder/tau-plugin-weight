@@ -51,9 +51,9 @@ export interface Profile {
 }
 
 export const ACTIVITY_LEVELS = [
-  { value: 1.2, label: "久坐", description: "办公室工作，日常很少走动" },
-  { value: 1.375, label: "轻度活动", description: "通勤步行，偶尔站立工作" },
-  { value: 1.55, label: "经常走动", description: "工作中大量站立或走动" },
+  { value: 1.2, labelKey: "settings.act.sedentary", descriptionKey: "settings.act.sedentaryDesc" },
+  { value: 1.375, labelKey: "settings.act.light", descriptionKey: "settings.act.lightDesc" },
+  { value: 1.55, labelKey: "settings.act.active", descriptionKey: "settings.act.activeDesc" },
 ] as const;
 
 export const DEFAULT_MOVE_GOAL = 30;

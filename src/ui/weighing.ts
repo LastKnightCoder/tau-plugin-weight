@@ -1,12 +1,14 @@
 /**
  * 称重面板共用（手机与桌面）：默认记到哪天哪个时段、某天的已有读数与参照、日期叫法与按钮文案。
  * 凌晨 0–4 点称重默认记到前一天睡前（睡前称重过了午夜），其余时间按 14 点分起床 / 睡前。
+ * 文案在调用边界按当前语言解析；这里的函数都显式接收翻译入口。
  */
 import type { QueryClient } from "@tanstack/react-query";
 import { toast } from "@tau/ui";
 import { addDays, dateKey, parseDateKey, type WeighSlot } from "../data/model";
 import type { Ledger } from "../data/stats";
 import type { WeightData } from "../data/store";
+import type { MessageKey, Translate } from "../i18n";
 import { WEIGHT_KEY } from "../runtime";
 import { dayLabel } from "./bits";
 
@@ -14,7 +16,7 @@ export const LATE_NIGHT_HOUR = 4;
 /** 面板里可直接换的天数（含今天），更早的从趋势页补 */
 export const PICK_DAYS = 7;
 
-export const SLOT_NAME: Record<WeighSlot, string> = { am: "起床", pm: "睡前" };
+export const SLOT_KEYS: Record<WeighSlot, MessageKey> = { am: "slot.am", pm: "slot.pm" };
 
 export const isLateNight = (now: Date) => now.getHours() < LATE_NIGHT_HOUR;
 export const isMorning = (now: Date) => !isLateNight(now) && now.getHours() < 14;
@@ -51,31 +53,30 @@ export function weighDay(ledger: Ledger, date: string): WeighDay {
 export const recentDates = (today: string) =>
   Array.from({ length: PICK_DAYS }, (_, k) => addDays(today, k - PICK_DAYS + 1));
 
-export function relativeDay(date: string, today: string): string {
-  if (date === today) return "今天";
-  if (date === addDays(today, -1)) return "昨天";
-  return dayLabel(date);
+export function relativeDay(t: Translate, date: string, today: string): string {
+  if (date === today) return t("date.today");
+  if (date === addDays(today, -1)) return t("date.yesterday");
+  return dayLabel(t, date);
 }
 
 /** 日期胶囊上的文字：今天、昨天带上具体日期 */
-export function pillText(date: string, today: string): string {
-  if (date === today) return `今天 · ${dayLabel(date)}`;
-  return date === addDays(today, -1) ? `昨天 · ${dayLabel(date)}` : dayLabel(date);
+export function pillText(t: Translate, date: string, today: string): string {
+  if (date === today) return `${t("date.today")} · ${dayLabel(t, date)}`;
+  return date === addDays(today, -1) ? `${t("date.yesterday")} · ${dayLabel(t, date)}` : dayLabel(t, date);
 }
 
-export const weekdayOf = (date: string) => `周${"日一二三四五六"[parseDateKey(date).getDay()]}`;
-
 /** 保存按钮：今天「记下」，其他日子写明记到哪天；已有读数为「更新」 */
-export function saveLabel(date: string, today: string, slot: WeighSlot, existing: boolean): string {
-  if (existing) return "更新";
-  if (date === today) return "记下";
-  if (date === addDays(today, -1)) return `记到昨天 · ${SLOT_NAME[slot]}`;
+export function saveLabel(t: Translate, date: string, today: string, slot: WeighSlot, existing: boolean): string {
+  if (existing) return t("wd.update");
+  if (date === today) return t("common.saveEntry");
+  if (date === addDays(today, -1)) return t("wd.savedYesterday", { slot: t(SLOT_KEYS[slot]) });
   const [, m, d] = date.split("-").map(Number);
-  return `补记到 ${m} 月 ${d} 日 · ${SLOT_NAME[slot]}`;
+  return t("wd.backfillSlot", { month: m, day: d, slot: t(SLOT_KEYS[slot]) });
 }
 
 /** 保存成功的吐司：写明记到哪天，可撤销（原来有读数就改回去，没有就删掉新记的） */
 export function notifySaved(
+  t: Translate,
   data: WeightData,
   client: QueryClient,
   saved: { date: string; slot: WeighSlot; kg: number; before: number | null },
@@ -83,7 +84,9 @@ export function notifySaved(
 ) {
   const { date, slot, kg, before } = saved;
   const text =
-    date === today ? `已记录 ${kg.toFixed(1)} kg` : `已记到${relativeDay(date, today)}${SLOT_NAME[slot]} · ${kg.toFixed(1)} kg`;
+    date === today
+      ? t("wd.loggedToday", { kg: kg.toFixed(1) })
+      : t("wd.loggedFor", { day: relativeDay(t, date, today), slot: t(SLOT_KEYS[slot]), kg: kg.toFixed(1) });
   const undo = async () => {
     try {
       if (before != null) await data.saveWeigh(date, slot, before);
@@ -93,8 +96,8 @@ export function notifySaved(
       }
       await client.invalidateQueries({ queryKey: WEIGHT_KEY });
     } catch {
-      toast.error("撤销失败");
+      toast.error(t("common.undoFailed"));
     }
   };
-  toast.success(text, { action: { label: "撤销", onClick: () => void undo() } });
+  toast.success(text, { action: { label: t("common.undo"), onClick: () => void undo() } });
 }

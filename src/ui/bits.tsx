@@ -1,9 +1,10 @@
 /**
- * 页面共用的小部件与格式化：数值、正负变化、类别色。
+ * 页面共用的小部件与格式化：数值、正负变化、类别色、日期文案。
  * 类别色取主题的数据色：饮食 tag-5、运动 tag-2；变化方向用 info（变轻）/ danger（变重），并始终带正负号。
  */
 import { useEffect, useRef, useState, type ReactNode } from "react";
 import { cn } from "@tau/ui";
+import type { Translate } from "../i18n";
 
 export const FOOD_COLOR = "var(--tau-tag-5)";
 export const MOVE_COLOR = "var(--tau-tag-2)";
@@ -89,10 +90,13 @@ export function useWidth<T extends HTMLElement>() {
   return [ref, width] as const;
 }
 
-const WEEK = "日一二三四五六";
-export function dayLabel(date: string): string {
+const WEEKDAY_KEYS = ["weekday.0", "weekday.1", "weekday.2", "weekday.3", "weekday.4", "weekday.5", "weekday.6"] as const;
+/** 周一开头的表头顺序（一 … 日） */
+export const WEEKDAYS = [1, 2, 3, 4, 5, 6, 0].map(i => WEEKDAY_KEYS[i]);
+export const weekdayKeyOf = (date: string) => WEEKDAY_KEYS[new Date(`${date}T00:00:00`).getDay()];
+export function dayLabel(t: Translate, date: string): string {
   const [y, m, d] = date.split("-").map(Number);
-  return `${m}月${d}日 周${WEEK[new Date(y, m - 1, d).getDay()]}`;
+  return t("date.day", { month: m, day: d, week: t(WEEKDAY_KEYS[new Date(y, m - 1, d).getDay()]) });
 }
 export function shortDate(date: string): string {
   const [, m, d] = date.split("-").map(Number);

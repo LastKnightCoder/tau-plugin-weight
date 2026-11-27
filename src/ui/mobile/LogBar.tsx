@@ -4,11 +4,13 @@
  */
 import { useEffect, useImperativeHandle, useRef, useState, type Ref } from "react";
 import { useQueryClient } from "@tanstack/react-query";
+import { useI18n } from "@tau/plugins";
 import { ArrowUp, History, Mic, Sparkles } from "lucide-react";
 import { cn, toast } from "@tau/ui";
 import { classify, fromMemory } from "../../data/parse";
 import { dateKey, foodKey, timeKey } from "../../data/model";
 import { useRuntime } from "../../runtime";
+import { messages } from "../../i18n";
 import { FOOD_COLOR } from "../bits";
 import { useFoods } from "../queries";
 import { addEntries } from "./actions";
@@ -41,6 +43,7 @@ export function LogBar({
   chips?: boolean;
 }) {
   const runtime = useRuntime();
+  const { t } = useI18n(messages);
   const client = useQueryClient();
   const foods = useFoods();
   const [text, setText] = useState("");
@@ -90,17 +93,17 @@ export function LogBar({
         await runtime.data.rememberFood(label, presetKcal);
       setText("");
       inputRef.current?.blur();
-      if (presetKcal == null) toast.info(`已记下「${entry.text}」，热量在后台估算`);
+      if (presetKcal == null) toast.info(t("mlb.savedPending", { text: entry.text }));
       else if (after != null)
-        toast.success(`已记下 · ${after < 0 ? `超出 ${-after}` : `还剩 ${after}`} kcal`, {
+        toast.success(after < 0 ? t("mlb.savedOver", { kcal: -after }) : t("mlb.savedLeft", { kcal: after }), {
           action: {
-            label: "撤销",
-            onClick: () => void import("./actions").then(m => m.removeWithUndo(runtime, client, entry)),
+            label: t("common.undo"),
+            onClick: () => void import("./actions").then(m => m.removeWithUndo(runtime, client, entry, t)),
           },
         });
-      else toast.success(`已记下「${entry.text}」`);
+      else toast.success(t("mlb.saved", { text: entry.text }));
     } catch {
-      toast.error("记录失败");
+      toast.error(t("common.logFailed"));
     } finally {
       setSaving(false);
     }
@@ -126,21 +129,22 @@ export function LogBar({
                 {effective != null ? (
                   <>
                     <History className="wt:size-[11px]" />
-                    {memoryKcal != null ? `常吃 · 上次 ${memoryKcal}` : "按你写的数字"}
+                    {memoryKcal != null ? t("mlb.memoryHit", { kcal: memoryKcal }) : t("mlb.manualKcal")}
                   </>
                 ) : (
                   <>
                     <Sparkles className="wt:size-[11px]" />
-                    {draft.kind === "move" ? `运动 ${draft.minutes} 分钟 · ` : ""}发送后 AI 在后台估算
+                    {draft.kind === "move" ? t("mlb.movePrefix", { minutes: draft.minutes }) : ""}
+                    {t("mlb.aiBackground")}
                   </>
                 )}
               </small>
             </span>
-            {effective != null && <Stepper value={effective} onChange={setKcal} label="热量" />}
+            {effective != null && <Stepper value={effective} onChange={setKcal} label={t("mlb.kcalLabel")} />}
           </div>
           {after != null && draft.kind === "food" && (
             <div className="wt:border-line-1 wt:text-ink-2 wt:mt-2.5 wt:flex wt:items-center wt:gap-2 wt:border-t wt:border-dashed wt:pt-2.5 wt:text-[12.5px]">
-              记下后{after < 0 ? "超出" : "还剩"}{" "}
+              {after < 0 ? t("mlb.afterOver") : t("mlb.afterLeft")}{" "}
               <b className={cn("wt:tabular-nums", after < 0 ? "wt:text-danger" : "wt:text-ink-1")}>{Math.abs(after)}</b>
               <Meter eaten={eaten} adding={effective!} total={eaten + (remaining ?? 0)} />
             </div>
@@ -176,14 +180,14 @@ export function LogBar({
               void submit();
             }
           }}
-          placeholder="吃了什么、动了多久…"
-          aria-label="一句话记录饮食或运动"
+          placeholder={t("mlb.placeholder")}
+          aria-label={t("ql.aria")}
           className="wt:placeholder:text-ink-3 wt:min-w-0 wt:flex-1 wt:bg-transparent wt:text-[15px] wt:outline-none"
         />
         {text.trim() ? (
           <button
             type="button"
-            aria-label="记下"
+            aria-label={t("common.saveEntry")}
             disabled={saving}
             // 按下时不让输入框失焦，避免键盘先收起再提交
             onPointerDown={e => e.preventDefault()}
@@ -195,7 +199,7 @@ export function LogBar({
         ) : (
           <button
             type="button"
-            aria-label="按住说话"
+            aria-label={t("hold.micAria")}
             {...talk.bind}
             className={cn(
               "wt:grid wt:size-10 wt:shrink-0 wt:touch-none wt:place-items-center wt:rounded-full wt:select-none",
@@ -226,14 +230,15 @@ function Meter({ eaten, adding, total }: { eaten: number; adding: number; total:
 }
 
 function TalkPanel({ talk }: { talk: HoldToTalk }) {
+  const { t } = useI18n(messages);
   return (
     <div className="wt:bg-surface wt:shadow-float wt:mb-2 wt:rounded-[20px] wt:px-3.5 wt:pt-4 wt:pb-3.5 wt:text-center">
       <p className="wt:min-h-[44px] wt:text-left wt:text-[15px] wt:leading-[1.6] wt:font-semibold">
-        {talk.preview || <span className="wt:text-ink-3 wt:font-normal">{talk.connecting ? "正在连接…" : "说说今天吃了什么、动了多久"}</span>}
+        {talk.preview || <span className="wt:text-ink-3 wt:font-normal">{talk.connecting ? t("hold.connecting") : t("hold.talkHint")}</span>}
       </p>
       <Wave live={!talk.connecting} cancel={talk.cancelArmed} />
       <p className={cn("wt:text-[11.5px]", talk.cancelArmed ? "wt:text-danger" : "wt:text-ink-3")}>
-        {talk.cancelArmed ? "松开 取消" : "松开 整理 · 上滑 取消"}
+        {talk.cancelArmed ? t("hold.cancelHint") : t("hold.sendHint")}
       </p>
     </div>
   );

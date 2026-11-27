@@ -1,6 +1,7 @@
 import { Scale } from "lucide-react";
 import { SIDEBAR_GROUPS, definePlugin, type PluginPageProps, type PluginSettingsProps } from "@tau/plugins";
 import { registerCollections } from "./data/store";
+import { messages } from "./i18n";
 import { createRuntime, RuntimeProvider } from "./runtime";
 import { HomePanel } from "./ui/HomePanel";
 import { MobileHomePanel } from "./ui/mobile/MobileHomePanel";
@@ -12,6 +13,7 @@ declare const __PLUGIN_META__: { id: string; name: string; version: string };
 
 export default definePlugin({
   ...__PLUGIN_META__,
+  i18n: messages,
   create: () => ({
     activate(context) {
       registerCollections(context);
@@ -21,7 +23,7 @@ export default definePlugin({
       const Page = mobile ? MobileWeightPage : WeightPage;
       const page = context.pages.register({
         id: "weight",
-        title: "减重",
+        title: messages.ref("app.page.title"),
         component: (props: PluginPageProps) => (
           <RuntimeProvider runtime={runtime}>
             <Page {...props} />
@@ -33,7 +35,7 @@ export default definePlugin({
       if (mobile)
         runtime.pages.trend = context.pages.register({
           id: "trend",
-          title: "趋势与效果",
+          title: messages.ref("app.page.trend"),
           component: (props: PluginPageProps) => (
             <RuntimeProvider runtime={runtime}>
               <MobileWeightPage {...props} params={{ ...props.params, view: "trend" }} />
@@ -41,19 +43,19 @@ export default definePlugin({
           ),
         });
       if (mobile)
-        context.navigation.registerEntry({ id: "weight", title: "减重", icon: Scale, page });
+        context.navigation.registerEntry({ id: "weight", title: messages.ref("app.page.title"), icon: Scale, page });
       else
         context.sidebar.registerItem({
           id: "weight",
-          title: "减重",
+          title: messages.ref("app.page.title"),
           icon: Scale,
           group: SIDEBAR_GROUPS.daily,
           page,
         });
       runtime.pages.settings = context.settings.register({
         id: "profile",
-        title: "身体数据与目标",
-        description: "用来计算每天的热量预算",
+        title: messages.ref("app.settings.title"),
+        description: messages.ref("app.settings.description"),
         component: (props: PluginSettingsProps) => (
           <RuntimeProvider runtime={runtime}>
             <SettingsForm {...props} />
@@ -62,9 +64,9 @@ export default definePlugin({
       });
       context.home.registerPanel({
         id: "today",
-        title: "减重",
+        title: messages.ref("app.page.title"),
         size: "compact",
-        action: { title: mobile ? "查看" : "查看趋势", run: () => page.open() },
+        action: { title: messages.ref(mobile ? "app.home.action.viewMobile" : "app.home.action.view"), run: () => page.open() },
         component: props => (
           <RuntimeProvider runtime={runtime}>
             {mobile ? <MobileHomePanel {...props} /> : <HomePanel />}
@@ -73,7 +75,7 @@ export default definePlugin({
       });
       context.commands.register({
         id: "weigh",
-        title: "减重：记录体重",
+        title: messages.ref("app.command.weigh"),
         run: async () => {
           await page.open({ weigh: "auto" });
           return null;

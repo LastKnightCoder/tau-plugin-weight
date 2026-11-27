@@ -3,14 +3,16 @@
  */
 import { useEffect, useState } from "react";
 import { useQueryClient } from "@tanstack/react-query";
+import { useI18n } from "@tau/plugins";
 import { ChevronDown, ChevronUp, Clock, Sunrise, Sunset } from "lucide-react";
 import { Button, Dialog, DialogBody, cn, toast } from "@tau/ui";
 import { addDays, type WeighSlot } from "../data/model";
 import type { Ledger } from "../data/stats";
 import { WEIGHT_KEY, useRuntime } from "../runtime";
+import { messages } from "../i18n";
 import { kg } from "./bits";
 import { useNow } from "./queries";
-import { SLOT_NAME, isLateNight, notifySaved, pillText, recentDates, relativeDay, saveLabel, weighDay } from "./weighing";
+import { SLOT_KEYS, isLateNight, notifySaved, pillText, recentDates, relativeDay, saveLabel, weighDay } from "./weighing";
 
 export interface WeighDialogState {
   date: string;
@@ -21,6 +23,7 @@ export interface WeighDialogState {
 
 export function WeighDialog({ state, onClose }: { state: WeighDialogState | null; onClose(): void }) {
   const { data, context } = useRuntime();
+  const { t } = useI18n(messages);
   const client = useQueryClient();
   const { date: now } = useNow();
   const [date, setDate] = useState("");
@@ -55,10 +58,10 @@ export function WeighDialog({ state, onClose }: { state: WeighDialogState | null
       await data.saveWeigh(date, slot, parsed);
       if (context.signal.aborted) return;
       await client.invalidateQueries({ queryKey: WEIGHT_KEY });
-      notifySaved(data, client, { date, slot, kg: parsed, before: day[slot] }, today);
+      notifySaved(t, data, client, { date, slot, kg: parsed, before: day[slot] }, today);
       onClose();
     } catch {
-      toast.error("保存失败");
+      toast.error(t("common.saveFailed"));
     } finally {
       setSaving(false);
     }
@@ -76,15 +79,15 @@ export function WeighDialog({ state, onClose }: { state: WeighDialogState | null
     <Dialog
       open={state != null}
       onOpenChange={open => !open && onClose()}
-      title="称重"
+      title={t("wd.title")}
       size="sm"
       footer={
         <>
           <Button variant="secondary" onClick={onClose}>
-            取消
+            {t("common.cancel")}
           </Button>
           <Button disabled={!valid} loading={saving} onClick={() => void save()}>
-            {date === today ? "保存" : saveLabel(date, today, slot, day?.[slot] != null)}
+            {date === today ? t("common.save") : saveLabel(t, date, today, slot, day?.[slot] != null)}
           </Button>
         </>
       }
@@ -101,7 +104,7 @@ export function WeighDialog({ state, onClose }: { state: WeighDialogState | null
               : "wt:text-ink-1 wt:shadow-[inset_0_0_0_1px_var(--tau-line-1)] wt:[&>svg]:text-ink-3"
           )}
         >
-          {date && pillText(date, today)}
+          {date && pillText(t, date, today)}
           {picking ? <ChevronUp /> : <ChevronDown />}
         </button>
         {picking && state ? (
@@ -112,7 +115,9 @@ export function WeighDialog({ state, onClose }: { state: WeighDialogState | null
               <p className="wt:bg-accent-soft wt:text-ink-2 wt:mt-3 wt:flex wt:items-start wt:gap-2 wt:rounded-[10px] wt:px-3 wt:py-2 wt:text-[12.5px] wt:leading-[1.55]">
                 <Clock className="wt:text-accent-text wt:mt-[3px] wt:size-3.5 wt:shrink-0" />
                 <span>
-                  已过午夜，还没睡就算<b className="wt:text-ink-1 wt:font-semibold">昨天</b>的睡前。
+                  {t("wd.lateNightBefore")}
+                  <b className="wt:text-ink-1 wt:font-semibold">{t("date.yesterday")}</b>
+                  {t("wd.lateNightAfter")}
                   <button
                     type="button"
                     onClick={() => {
@@ -121,12 +126,12 @@ export function WeighDialog({ state, onClose }: { state: WeighDialogState | null
                     }}
                     className="wt:text-accent-text wt:ml-1 wt:font-semibold wt:hover:underline"
                   >
-                    改成今天
+                    {t("wd.changeToToday")}
                   </button>
                 </span>
               </p>
             )}
-            <div className="wt:mt-3 wt:grid wt:grid-cols-2 wt:gap-2" role="radiogroup" aria-label="称重时段">
+            <div className="wt:mt-3 wt:grid wt:grid-cols-2 wt:gap-2" role="radiogroup" aria-label={t("wd.slotAria")}>
               {(["am", "pm"] as const).map(key => (
                 <button
                   key={key}
@@ -142,7 +147,7 @@ export function WeighDialog({ state, onClose }: { state: WeighDialogState | null
                   )}
                 >
                   {key === "am" ? <Sunrise /> : <Sunset />}
-                  {SLOT_NAME[key]}
+                  {t(SLOT_KEYS[key])}
                   {day?.[key] != null && <span className="wt:text-ink-3 wt:font-normal wt:tabular-nums">· {kg(day[key])}</span>}
                 </button>
               ))}
@@ -160,7 +165,7 @@ export function WeighDialog({ state, onClose }: { state: WeighDialogState | null
                     void save();
                   }
                 }}
-                aria-label="体重（千克）"
+                aria-label={t("wd.weightAria")}
                 placeholder="0.0"
                 className="wt:placeholder:text-ink-3 wt:w-[140px] wt:bg-transparent wt:text-[40px] wt:font-semibold wt:tracking-[-0.02em] wt:tabular-nums wt:outline-none"
               />
@@ -168,16 +173,16 @@ export function WeighDialog({ state, onClose }: { state: WeighDialogState | null
               <span className="wt:text-ink-2 wt:ml-auto wt:text-right wt:text-[12px] wt:leading-[1.6]">
                 {reference != null && (
                   <>
-                    {slot === "pm" ? (date === today ? "今早" : "当天晨重") : "上次晨重"} {kg(reference)}
+                    {slot === "pm" ? (date === today ? t("wd.refTodayAm") : t("wd.refPastAm")) : t("wd.refLastAm")} {kg(reference)}
                     <br />
                   </>
                 )}
-                <span className="wt:text-ink-3">{slot === "am" ? "空腹、如厕后称最准" : "只用来看日内波动"}</span>
+                <span className="wt:text-ink-3">{slot === "am" ? t("wd.amTip") : t("wd.pmTip")}</span>
               </span>
             </div>
             <p className="wt:text-ink-3 wt:mt-3 wt:flex wt:items-center wt:gap-1.5 wt:text-[12px]">
               {slot === "am" ? <Sunrise className="wt:size-3.5" /> : <Sunset className="wt:size-3.5" />}
-              趋势只看晨重；同一天同一时段再称一次会覆盖。
+              {t("wd.trendNote")}
             </p>
           </>
         )}
@@ -188,8 +193,9 @@ export function WeighDialog({ state, onClose }: { state: WeighDialogState | null
 
 /** 近 7 天：右侧是起床 · 睡前读数，没称写「没称」 */
 function DayList({ ledger, today, value, onPick }: { ledger: Ledger; today: string; value: string; onPick(date: string): void }) {
+  const { t } = useI18n(messages);
   return (
-    <div className="wt:mt-2.5 wt:flex wt:flex-col wt:gap-0.5" role="radiogroup" aria-label="称重日期">
+    <div className="wt:mt-2.5 wt:flex wt:flex-col wt:gap-0.5" role="radiogroup" aria-label={t("wd.dateAria")}>
       {recentDates(today)
         .reverse()
         .map(date => {
@@ -209,10 +215,10 @@ function DayList({ ledger, today, value, onPick }: { ledger: Ledger; today: stri
                 on ? "wt:bg-accent-soft wt:text-accent-text wt:font-semibold" : "wt:hover:bg-hover"
               )}
             >
-              {relativeDay(date, today)}
+              {relativeDay(t, date, today)}
               {date >= addDays(today, -1) && <span className="wt:text-ink-3 wt:font-normal">{date.slice(5).replace("-", "/")}</span>}
               <span className="wt:text-ink-3 wt:ml-auto wt:font-normal wt:tabular-nums">
-                {am == null && pm == null ? "没称" : `${kg(am)} · ${kg(pm)}`}
+                {am == null && pm == null ? t("wd.notWeighed") : `${kg(am)} · ${kg(pm)}`}
               </span>
             </button>
           );

@@ -3,9 +3,11 @@
  * 触控目标不小于 32px；颜色只用主题 token 与 bits 里的数据色。
  */
 import type { ReactNode } from "react";
+import { useI18n } from "@tau/plugins";
 import { Footprints, Minus, Plus, UtensilsCrossed } from "lucide-react";
 import { cn } from "@tau/ui";
 import type { EntryKind } from "../../data/model";
+import { messages } from "../../i18n";
 import { FOOD_COLOR, GAIN_COLOR, MOVE_COLOR } from "../bits";
 
 export function MCard({ className, children, onClick }: { className?: string; children: ReactNode; onClick?(): void }) {
@@ -71,11 +73,12 @@ export function Stepper({
   unit?: string;
   label: string;
 }) {
+  const { t } = useI18n(messages);
   return (
     <div className="wt:bg-hover wt:flex wt:shrink-0 wt:items-center wt:gap-0.5 wt:rounded-[12px] wt:p-[3px]" role="group" aria-label={label}>
       <button
         type="button"
-        aria-label={`减少 ${step}`}
+        aria-label={t("parts.decrease", { step })}
         onClick={() => onChange(Math.max(0, value - step))}
         className="wt:text-ink-2 wt:grid wt:size-8 wt:place-items-center wt:rounded-[9px] wt:active:bg-press"
       >
@@ -87,7 +90,7 @@ export function Stepper({
       </span>
       <button
         type="button"
-        aria-label={`增加 ${step}`}
+        aria-label={t("parts.increase", { step })}
         onClick={() => onChange(value + step)}
         className="wt:text-ink-2 wt:grid wt:size-8 wt:place-items-center wt:rounded-[9px] wt:active:bg-press"
       >

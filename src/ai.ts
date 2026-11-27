@@ -17,6 +17,7 @@ import {
 import type { Entry, Profile } from "./data/model";
 import type { DaySummary, Overview } from "./data/stats";
 import { compareGroups } from "./data/stats";
+import type { MessageKey } from "./i18n";
 
 export type AIScope = "today" | "week";
 
@@ -136,18 +137,18 @@ export function analysisPrompt(scope: AIScope, input: AnalysisInput): string {
   return lines.join("\n");
 }
 
-/** 错误代码 → 给用户看的提示；返回 null 表示不用提示（已取消） */
-export function aiErrorMessage(error: unknown): string | null {
+/** 错误代码 → 词典 key；返回 null 表示不用提示（已取消），展示边界再翻译 */
+export function aiErrorKey(error: unknown): MessageKey | null {
   const message = error instanceof Error ? error.message : String(error);
   if (/AI_ABORTED|AbortError/.test(message) || (error instanceof Error && error.name === "AbortError"))
     return null;
-  if (message.startsWith("AI_NOT_CONFIGURED")) return "还没有为「对话功能」分配模型";
-  if (message.startsWith("AI_DISABLED")) return "没有授权使用 AI";
-  if (message.startsWith("AI_QUOTA_EXCEEDED")) return "插件的今日 AI 额度不足";
-  if (message.startsWith("AI_CONCURRENCY_LIMIT")) return "AI 正忙，稍后再试";
-  if (message.startsWith("AI_UNAVAILABLE")) return "当前设备不支持 AI";
-  if (message.startsWith("AI_BAD_REPLY")) return "AI 没给出可用的热量，请手动填写";
-  return "AI 请求失败";
+  if (message.startsWith("AI_NOT_CONFIGURED")) return "ai.error.notConfigured";
+  if (message.startsWith("AI_DISABLED")) return "ai.error.disabled";
+  if (message.startsWith("AI_QUOTA_EXCEEDED")) return "ai.error.quota";
+  if (message.startsWith("AI_CONCURRENCY_LIMIT")) return "ai.error.busy";
+  if (message.startsWith("AI_UNAVAILABLE")) return "ai.error.unavailable";
+  if (message.startsWith("AI_BAD_REPLY")) return "ai.error.noKcal";
+  return "ai.error.failed";
 }
 
 export const needsSetup = (error: unknown) =>

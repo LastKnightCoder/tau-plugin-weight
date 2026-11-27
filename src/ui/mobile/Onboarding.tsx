@@ -4,11 +4,13 @@
  */
 import { useState, type ReactNode } from "react";
 import { useQueryClient } from "@tanstack/react-query";
+import { useI18n } from "@tau/plugins";
 import { ChartLine, ChevronLeft, Flame, Scale, Sunrise, UtensilsCrossed } from "lucide-react";
 import { cn, toast } from "@tau/ui";
 import { ACTIVITY_LEVELS, dateKey, type Sex } from "../../data/model";
 import { dailyBudget, dailyBurn } from "../../data/stats";
 import { WEIGHT_KEY, useRuntime } from "../../runtime";
+import { messages, type MessageKey } from "../../i18n";
 import { toDraft, validate, type Draft } from "../SettingsForm";
 import { FOOD_COLOR, MOVE_COLOR } from "../bits";
 import { MCard, PrimaryButton } from "./parts";
@@ -29,6 +31,7 @@ export function Onboarding({
   onClose(): void;
 }) {
   const { data } = useRuntime();
+  const { t } = useI18n(messages);
   const client = useQueryClient();
   const [step, setStep] = useState<1 | 2>(1);
   const [draft, setDraft] = useState<Draft>(() => toDraft(null));
@@ -60,7 +63,7 @@ export function Onboarding({
       await client.invalidateQueries({ queryKey: WEIGHT_KEY });
       return true;
     } catch {
-      toast.error("保存失败");
+      toast.error(t("common.saveFailed"));
       return false;
     } finally {
       setSaving(false);
@@ -78,7 +81,7 @@ export function Onboarding({
       <div className="wt:flex wt:h-12 wt:shrink-0 wt:items-center wt:px-1.5">
         <button
           type="button"
-          aria-label={step === 2 ? "上一步" : "返回"}
+          aria-label={step === 2 ? t("ob.backAria") : t("ob.closeAria")}
           onClick={() => (step === 2 ? setStep(1) : profileOnly ? onClose() : void skip())}
           className="wt:grid wt:size-10 wt:place-items-center wt:rounded-[12px]"
         >
@@ -87,54 +90,54 @@ export function Onboarding({
         <span className="wt:flex-1" />
         {!profileOnly && (
           <button type="button" onClick={() => void skip()} className="wt:text-ink-3 wt:px-3 wt:text-[14px]">
-            跳过
+            {t("ob.skip")}
           </button>
         )}
       </div>
       <div className="wt:min-h-0 wt:flex-1 wt:overflow-y-auto wt:overscroll-contain wt:px-4 wt:pb-3">
         {!profileOnly && (
-          <div className="wt:mb-1 wt:flex wt:justify-center wt:gap-[5px]" aria-label={`第 ${step} 步，共 2 步`}>
+          <div className="wt:mb-1 wt:flex wt:justify-center wt:gap-[5px]" aria-label={t("ob.stepAria", { step })}>
             <i className={cn("wt:h-1 wt:rounded-full", step === 1 ? "wt:bg-accent wt:w-7" : "wt:bg-line-1 wt:w-[18px]")} />
             <i className={cn("wt:h-1 wt:rounded-full", step === 2 ? "wt:bg-accent wt:w-7" : "wt:bg-line-1 wt:w-[18px]")} />
           </div>
         )}
         {step === 1 ? (
           <>
-            <Heading title="先算出你每天能吃多少" note="按身高、年龄、性别和体重估算日常消耗，再减 500 kcal" />
+            <Heading title={t("ob.title1")} note={t("ob.note1")} />
             <MCard className="wt:divide-y wt:divide-line-2 wt:py-0.5">
-              <NumberRow label="身高" unit="cm" value={draft.heightCm} placeholder="170" error={draft.heightCm ? errors.heightCm : undefined} onChange={heightCm => set({ heightCm })} />
-              <NumberRow label="出生年份" unit="年" value={draft.birthYear} placeholder="1994" error={draft.birthYear.length >= 4 ? errors.birthYear : undefined} onChange={birthYear => set({ birthYear })} />
-              <Row label="性别">
+              <NumberRow label={t("settings.heightCm")} unit="cm" value={draft.heightCm} placeholder="170" error={draft.heightCm ? errors.heightCm : undefined} onChange={heightCm => set({ heightCm })} />
+              <NumberRow label={t("settings.birthYear")} unit={t("unit.year")} value={draft.birthYear} placeholder="1994" error={draft.birthYear.length >= 4 ? errors.birthYear : undefined} onChange={birthYear => set({ birthYear })} />
+              <Row label={t("settings.sex")}>
                 <Choice<Sex>
                   value={draft.sex}
                   onChange={sex => set({ sex })}
                   options={[
-                    ["male", "男"],
-                    ["female", "女"],
+                    ["male", t("settings.male")],
+                    ["female", t("settings.female")],
                   ]}
                 />
               </Row>
-              <NumberRow label="现在体重" unit="kg" value={weight} placeholder="70.0" onChange={setWeight} />
-              <Row label="日常活动">
+              <NumberRow label={t("settings.weightNow")} unit="kg" value={weight} placeholder="70.0" onChange={setWeight} />
+              <Row label={t("settings.activity")}>
                 <select
                   value={draft.activity}
                   onChange={e => set({ activity: e.target.value })}
-                  aria-label="日常活动"
+                  aria-label={t("settings.activity")}
                   className="wt:text-ink-2 wt:bg-transparent wt:text-right wt:outline-none"
                 >
                   {ACTIVITY_LEVELS.map(level => (
                     <option key={level.value} value={String(level.value)}>
-                      {level.label}
+                      {t(level.labelKey)}
                     </option>
                   ))}
                 </select>
               </Row>
-              <NumberRow label="目标体重" unit="kg" value={draft.goalKg} placeholder="选填" error={draft.goalKg ? errors.goalKg : undefined} onChange={goalKg => set({ goalKg })} />
+              <NumberRow label={t("settings.goalKg")} unit="kg" value={draft.goalKg} placeholder={t("settings.optional")} error={draft.goalKg ? errors.goalKg : undefined} onChange={goalKg => set({ goalKg })} />
             </MCard>
             <MCard className="wt:bg-accent-soft wt:mt-3 wt:flex wt:items-center wt:gap-3 wt:shadow-none">
               <Flame className="wt:text-accent-text wt:size-[22px] wt:shrink-0" />
               <div className="wt:flex-1">
-                <div className="wt:text-accent-text wt:text-[12px]">每日预算</div>
+                <div className="wt:text-accent-text wt:text-[12px]">{t("ob.budgetPreview")}</div>
                 <div className="wt:text-accent-text wt:text-[22px] wt:font-bold wt:tabular-nums">
                   {budget != null ? budget.toLocaleString() : "—"} <small className="wt:text-[12px] wt:font-medium">kcal</small>
                 </div>
@@ -142,32 +145,32 @@ export function Onboarding({
               <div className="wt:text-accent-text wt:text-right wt:text-[11.5px] wt:leading-[1.5]">
                 {burn != null ? (
                   <>
-                    消耗约 {burn.toLocaleString()}
+                    {t("ob.burnHint", { burn: burn.toLocaleString() })}
                     <br />
-                    体重降了会自动下调
+                    {t("ob.autoDown")}
                   </>
                 ) : (
-                  "填好身高、年份和体重后显示"
+                  t("ob.budgetPlaceholder")
                 )}
               </div>
             </MCard>
           </>
         ) : (
           <>
-            <Heading title="每天只做三件小事" note="少吃、多动不用打卡，记录会自动判定" />
+            <Heading title={t("ob.title2")} note={t("ob.note2")} />
             <MCard className="wt:py-1">
-              <Tip icon={<Sunrise />} tone="var(--tau-tag-1)" title="起床称一次">
-                趋势只看晨重的 7 日均值，单日波动不用在意。睡前可以再称一次，看当天吃得多不多。
+              <Tip icon={<Sunrise />} tone="var(--tau-tag-1)" title={t("ob.tip1Title")}>
+                {t("ob.tip1Body")}
               </Tip>
-              <Tip icon={<UtensilsCrossed />} tone={FOOD_COLOR} title="吃之前写一句或说一句">
-                「奶茶一杯」「跑步 30 分钟」，AI 在后台估算热量，常吃的东西记一次以后自动带出。
+              <Tip icon={<UtensilsCrossed />} tone={FOOD_COLOR} title={t("ob.tip2Title")}>
+                {t("ob.tip2Body")}
               </Tip>
-              <Tip icon={<ChartLine />} tone={MOVE_COLOR} title="一两周后看效果">
-                比较少吃、多动的日子第二天轻多少，看哪样对你更管用。
+              <Tip icon={<ChartLine />} tone={MOVE_COLOR} title={t("ob.tip3Title")}>
+                {t("ob.tip3Body")}
               </Tip>
             </MCard>
             <MCard className="wt:mt-3 wt:py-1">
-              <Row label="在今天页显示减重卡片">
+              <Row label={t("ob.homeCardRow")}>
                 <button
                   type="button"
                   role="switch"
@@ -194,23 +197,23 @@ export function Onboarding({
               })
             }
           >
-            {profileOnly ? "保存" : "下一步"}
+            {profileOnly ? t("common.save") : t("ob.next")}
           </PrimaryButton>
         ) : (
           <>
             <PrimaryButton onClick={() => void finish(!kgValid)}>
               {kgValid ? (
-                "开始记录"
+                t("ob.startLogging")
               ) : (
                 <>
                   <Scale />
-                  现在称一下
+                  {t("ob.weighNow")}
                 </>
               )}
             </PrimaryButton>
             {!kgValid && (
               <button type="button" onClick={() => void finish(false)} className="wt:text-ink-2 wt:block wt:w-full wt:pt-2.5 wt:text-[13px]">
-                先看看
+                {t("ob.justLook")}
               </button>
             )}
           </>
@@ -250,9 +253,10 @@ function NumberRow({
   unit: string;
   value: string;
   placeholder: string;
-  error?: string;
+  error?: MessageKey;
   onChange(value: string): void;
 }) {
+  const { t } = useI18n(messages);
   return (
     <label className="wt:flex wt:min-h-[50px] wt:flex-col wt:justify-center wt:text-[14.5px]">
       <span className="wt:flex wt:items-center wt:gap-2.5">
@@ -267,7 +271,7 @@ function NumberRow({
         />
         <span className="wt:text-ink-3 wt:w-6 wt:text-[12.5px]">{unit}</span>
       </span>
-      {error && <span className="wt:text-danger wt:pb-1.5 wt:text-right wt:text-[11.5px]">{error}</span>}
+      {error && <span className="wt:text-danger wt:pb-1.5 wt:text-right wt:text-[11.5px]">{t(error)}</span>}
     </label>
   );
 }

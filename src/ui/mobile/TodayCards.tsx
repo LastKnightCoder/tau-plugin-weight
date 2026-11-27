@@ -3,11 +3,14 @@
  * 流水左滑露出「改 / 删除」，点按打开编辑面板；估算中的行显示占位，失败的行给「填热量」。
  */
 import { useRef, useState, type PointerEvent, type ReactNode } from "react";
+import { useI18n } from "@tau/plugins";
 import { ChevronRight, ChevronUp, Footprints, Pencil, Plus, Sparkles, Sunrise, Sunset, Trash2 } from "lucide-react";
 import { cn } from "@tau/ui";
 import type { Entry, WeighSlot } from "../../data/model";
 import type { DaySummary, GroupStat, Overview } from "../../data/stats";
+import { messages } from "../../i18n";
 import { MOVE_COLOR, dayLabel, kg, signed } from "../bits";
+import type { Translate } from "../../i18n";
 import { isMorning } from "../weighing";
 import { KindIcon, MCard, Ring } from "./parts";
 
@@ -24,20 +27,21 @@ export function HeroCard({
   onWeigh(slot: WeighSlot): void;
   onSetup(): void;
 }) {
-  const t = o.today;
-  const delta = t.am != null && o.yesterday?.am != null ? t.am - o.yesterday.am : null;
-  const total = t.budget + t.burn;
-  const over = t.budget > 0 && t.remaining < 0;
+  const { t } = useI18n(messages);
+  const day = o.today;
+  const delta = day.am != null && o.yesterday?.am != null ? day.am - o.yesterday.am : null;
+  const total = day.budget + day.burn;
+  const over = day.budget > 0 && day.remaining < 0;
   const morning = isMorning(new Date());
   return (
     <MCard>
       <div className="wt:flex wt:items-center wt:gap-3.5">
-        {t.budget > 0 ? (
-          <Ring eaten={t.intake} total={total}>
+        {day.budget > 0 ? (
+          <Ring eaten={day.intake} total={total}>
             <b className="wt:text-[22px] wt:leading-none wt:font-bold wt:tracking-[-0.02em] wt:tabular-nums">
-              {over ? `−${-t.remaining}` : t.remaining}
+              {over ? `−${-day.remaining}` : day.remaining}
             </b>
-            <small className="wt:text-ink-3 wt:mt-1 wt:text-[10.5px]">{over ? "超了 kcal" : "还能吃"}</small>
+            <small className="wt:text-ink-3 wt:mt-1 wt:text-[10.5px]">{over ? t("tc.ringOver") : t("wc.left")}</small>
           </Ring>
         ) : (
           <Ring eaten={0} total={0}>
@@ -45,37 +49,37 @@ export function HeroCard({
           </Ring>
         )}
         <div className="wt:min-w-0 wt:flex-1">
-          <div className="wt:text-ink-3 wt:text-[12px]">今天还能吃 · {dayLabel(t.date)}</div>
-          {t.budget > 0 ? (
+          <div className="wt:text-ink-3 wt:text-[12px]">{t("wc.budgetTitle")} · {dayLabel(t, day.date)}</div>
+          {day.budget > 0 ? (
             <>
               <div className={cn("wt:my-0.5 wt:text-[30px] wt:font-bold wt:tracking-[-0.03em] wt:tabular-nums", over && "wt:text-danger")}>
-                {Math.abs(t.remaining)}
+                {Math.abs(day.remaining)}
                 <small className="wt:text-ink-3 wt:ml-1 wt:text-[13px] wt:font-medium wt:tracking-normal">
-                  {over ? "kcal 超了" : "kcal"}
+                  {over ? t("tc.kcalOver") : "kcal"}
                 </small>
               </div>
               <div className="wt:text-ink-2 wt:text-[11.5px] wt:leading-[1.6]">
-                预算 <b className="wt:text-ink-1 wt:font-semibold wt:tabular-nums">{t.budget}</b>
-                {t.burn > 0 && (
+                {t("tc.budgetLabel")} <b className="wt:text-ink-1 wt:font-semibold wt:tabular-nums">{day.budget}</b>
+                {day.burn > 0 && (
                   <>
-                    {" "}+ 运动 <b className="wt:text-ink-1 wt:font-semibold wt:tabular-nums">{t.burn}</b>
+                    {" "}+ {t("dl.move")} <b className="wt:text-ink-1 wt:font-semibold wt:tabular-nums">{day.burn}</b>
                   </>
                 )}{" "}
-                − 已吃 <b className="wt:text-ink-1 wt:font-semibold wt:tabular-nums">{t.intake}</b>
-                {t.unsettled > 0 && <span className="wt:text-ink-3"> · {t.unsettled} 条估算中</span>}
+                − {t("tc.formulaEaten")} <b className="wt:text-ink-1 wt:font-semibold wt:tabular-nums">{day.intake}</b>
+                {day.unsettled > 0 && <span className="wt:text-ink-3">{t("tc.unsettled", { count: day.unsettled })}</span>}
               </div>
             </>
           ) : (
             <>
-              <div className="wt:my-1 wt:text-[14.5px] wt:font-semibold">{hasProfile ? "称一次体重后显示" : "填身体数据后显示"}</div>
-              <div className="wt:text-ink-2 wt:text-[11.5px]">不填也能记体重和饮食</div>
+              <div className="wt:my-1 wt:text-[14.5px] wt:font-semibold">{hasProfile ? t("tc.noBudgetProfile") : t("tc.noBudgetData")}</div>
+              <div className="wt:text-ink-2 wt:text-[11.5px]">{t("tc.noBudgetHint")}</div>
               {!hasProfile && (
                 <button
                   type="button"
                   onClick={onSetup}
                   className="wt:bg-accent wt:text-ink-inverse wt:mt-2 wt:h-8 wt:rounded-[10px] wt:px-3 wt:text-[13px] wt:font-semibold"
                 >
-                  去填写
+                  {t("tc.goFill")}
                 </button>
               )}
             </>
@@ -85,12 +89,12 @@ export function HeroCard({
       <div className="wt:mt-3 wt:grid wt:grid-cols-3 wt:gap-2">
         <Tile
           icon={<Sunrise />}
-          label="晨重"
-          empty={t.am == null}
-          emptyText="起床称"
+          label={t("wt.legend.am")}
+          empty={day.am == null}
+          emptyText={t("tc.wakeEmpty")}
           onClick={() => onWeigh("am")}
         >
-          {kg(t.am)}
+          {kg(day.am)}
           {delta != null && (
             <small className={cn("wt:ml-1 wt:text-[11px] wt:font-medium", delta <= 0 ? "wt:text-info" : "wt:text-danger")}>
               {signed(delta)}
@@ -99,25 +103,25 @@ export function HeroCard({
         </Tile>
         <Tile
           icon={<Sunset />}
-          label="睡前"
-          empty={t.pm == null}
-          muted={t.pm == null && morning}
-          emptyText={morning ? "晚上再称" : "称一下"}
+          label={t("slot.pm")}
+          empty={day.pm == null}
+          muted={day.pm == null && morning}
+          emptyText={morning ? t("tc.pmEmptyMorning") : t("tc.pmEmpty")}
           onClick={() => onWeigh("pm")}
         >
-          {kg(t.pm)}
+          {kg(day.pm)}
         </Tile>
         <div className="wt:bg-hover wt:flex wt:min-h-[62px] wt:flex-col wt:gap-0.5 wt:rounded-[13px] wt:px-2.5 wt:pt-[9px] wt:pb-2">
           <span className="wt:text-ink-3 wt:flex wt:items-center wt:gap-1 wt:text-[11px] wt:[&>svg]:size-3">
             <Footprints />
-            运动
+            {t("dl.move")}
           </span>
           <span className="wt:text-[18px] wt:font-[650] wt:tracking-[-0.02em] wt:tabular-nums">
-            {t.moveMinutes}
-            <small className="wt:text-ink-3 wt:ml-1 wt:text-[11px] wt:font-medium wt:tracking-normal">/ {moveGoal} 分</small>
+            {day.moveMinutes}
+            <small className="wt:text-ink-3 wt:ml-1 wt:text-[11px] wt:font-medium wt:tracking-normal">{t("tc.moveUnitShort", { goal: moveGoal })}</small>
           </span>
           <span className="wt:bg-track wt:mt-1 wt:h-1 wt:overflow-hidden wt:rounded-full">
-            <i className="wt:block wt:h-full wt:rounded-full" style={{ width: `${Math.min(100, (t.moveMinutes / moveGoal) * 100)}%`, background: MOVE_COLOR }} />
+            <i className="wt:block wt:h-full wt:rounded-full" style={{ width: `${Math.min(100, (day.moveMinutes / moveGoal) * 100)}%`, background: MOVE_COLOR }} />
           </span>
         </div>
       </div>
@@ -142,11 +146,12 @@ function Tile({
   onClick(): void;
   children: ReactNode;
 }) {
+  const { t } = useI18n(messages);
   return (
     <button
       type="button"
       onClick={onClick}
-      aria-label={empty ? `${label}：${emptyText}` : `改${label}`}
+      aria-label={empty ? t("tc.tileAriaEmpty", { label, empty: emptyText }) : t("tc.tileAriaEdit", { label })}
       className={cn(
         "wt:flex wt:min-h-[62px] wt:flex-col wt:gap-0.5 wt:rounded-[13px] wt:px-2.5 wt:pt-[9px] wt:pb-2 wt:text-left wt:active:scale-[0.97] wt:transition-transform",
         !empty
@@ -184,12 +189,13 @@ export function TrendMini({
   groups: GroupStat[];
   onOpen(): void;
 }) {
+  const { t } = useI18n(messages);
   const values = days.map(d => d.avg).filter((v): v is number => v != null);
   const change = values.length >= 2 ? values[values.length - 1] - values[0] : null;
   return (
     <MCard onClick={onOpen} className="wt:flex wt:items-center wt:gap-3 wt:py-3">
       <div className="wt:min-w-0 wt:flex-1">
-        <div className="wt:text-ink-3 wt:text-[12px]">7 日均值 · 30 天</div>
+        <div className="wt:text-ink-3 wt:text-[12px]">{t("tc.trendAvgLabel")}</div>
         <div className="wt:text-[20px] wt:font-bold wt:tracking-[-0.02em] wt:tabular-nums">
           {kg(o.latestAvg)}{" "}
           {change != null && (
@@ -199,7 +205,7 @@ export function TrendMini({
           )}
         </div>
         <div className="wt:text-ink-2 wt:mt-0.5 wt:truncate wt:text-[11.5px]">
-          {[o.toGoal != null ? `距目标 ${Math.max(0, o.toGoal).toFixed(1)} kg` : null, miniConclusion(groups)].filter(Boolean).join(" · ")}
+          {[o.toGoal != null ? t("tc.toGoalKg", { kg: Math.max(0, o.toGoal).toFixed(1) }) : null, miniConclusion(t, groups)].filter(Boolean).join(" · ")}
         </div>
       </div>
       <Spark values={values} />
@@ -208,13 +214,13 @@ export function TrendMini({
   );
 }
 
-function miniConclusion(groups: GroupStat[]) {
+function miniConclusion(t: Translate, groups: GroupStat[]) {
   const [, eat, move] = groups;
   const enough = (g: GroupStat) => g.days >= 5 && g.mean != null;
-  if (enough(eat) && enough(move)) return eat.mean! < move.mean! ? "少吃比多动管用" : "多动比少吃管用";
-  if (enough(eat)) return "少吃是主力";
-  if (enough(move)) return "多动是主力";
-  return "再记一周就能看出效果";
+  if (enough(eat) && enough(move)) return eat.mean! < move.mean! ? t("tc.miniEatWins") : t("tc.miniMoveWins");
+  if (enough(eat)) return t("ig.conclusion.eatMain");
+  if (enough(move)) return t("ig.conclusion.moveMain");
+  return t("tc.miniKeep");
 }
 
 function Spark({ values, width = 104, height = 44 }: { values: number[]; width?: number; height?: number }) {
@@ -264,6 +270,7 @@ export function TodayList({
   onDelete(entry: Entry): void;
   onFill(text: string): void;
 }) {
+  const { t } = useI18n(messages);
   const [expanded, setExpanded] = useState(false);
   const [opened, setOpened] = useState<string | null>(null);
   const foods = entries.filter(e => e.kind === "food").length;
@@ -274,9 +281,9 @@ export function TodayList({
   return (
     <MCard className="wt:pb-1.5">
       <div className="wt:mb-1 wt:flex wt:items-center wt:gap-1.5">
-        <h2 className="wt:text-[13.5px] wt:font-[650]">今天</h2>
+        <h2 className="wt:text-[13.5px] wt:font-[650]">{t("date.today")}</h2>
         <small className="wt:text-ink-3 wt:text-[11.5px]">
-          {foods} 条饮食 · {moves} 次运动
+          {t("dl.foodCount", { count: foods })} · {t("dl.moveCount", { count: moves })}
         </small>
         <span className="wt:flex-1" />
         {entries.length > COLLAPSED && (
@@ -285,7 +292,7 @@ export function TodayList({
             onClick={() => setExpanded(v => !v)}
             className="wt:text-ink-3 wt:-mr-1 wt:flex wt:h-7 wt:items-center wt:gap-0.5 wt:px-1 wt:text-[12px] wt:font-medium"
           >
-            {expanded ? "收起" : `前 ${hidden} 条`}
+            {expanded ? t("tc.collapse") : t("tc.showOlder", { count: hidden })}
             <ChevronUp className={cn("wt:size-[13px] wt:transition-transform", expanded && "wt:rotate-180")} />
           </button>
         )}
@@ -308,9 +315,9 @@ export function TodayList({
             onClick={() => onFill("晚饭 ")}
             text={
               <>
-                <b className="wt:text-ink-2 wt:font-semibold">晚饭</b> 还没记
+                <b className="wt:text-ink-2 wt:font-semibold">{t("dl.dinnerLabel")}</b> {t("dl.notLogged")}
                 {remaining != null &&
-                  (remaining > 0 ? ` · 建议 ≤ ${Math.max(0, remaining - 100)} kcal` : " · 今天已经吃满了")}
+                  (remaining > 0 ? t("tc.dinnerSuggest", { kcal: Math.max(0, remaining - 100) }) : t("tc.dinnerDone"))}
               </>
             }
           />
@@ -321,16 +328,16 @@ export function TodayList({
             onClick={() => onFill(`散步 ${moveGoal - moveMinutes} 分钟`)}
             text={
               <>
-                <b className="wt:text-ink-2 wt:font-semibold">运动</b> 还差 {moveGoal - moveMinutes} 分钟
+                <b className="wt:text-ink-2 wt:font-semibold">{t("dl.move")}</b> {t("dl.moveGap", { minutes: moveGoal - moveMinutes })}
               </>
             }
           />
         )}
         {entries.length === 0 && (
           <p className="wt:text-ink-3 wt:py-5 wt:text-center wt:text-[12.5px] wt:leading-[1.7]">
-            在下面写一句「早饭两个包子」，
+            {t("tc.emptyHint1")}
             <br />
-            或者按住麦克风说今天吃了什么
+            {t("tc.emptyHint2")}
           </p>
         )}
       </div>
@@ -339,18 +346,26 @@ export function TodayList({
 }
 
 function Row({ entry, highlighted, onClick }: { entry: Entry; highlighted: boolean; onClick(): void }) {
+  const { t } = useI18n(messages);
   const note =
     entry.estimate === "pending" ? (
       <span className="wt:text-accent-text wt:inline-flex wt:items-center wt:gap-0.5">
         <Sparkles className="wt:size-2.5" />
-        {entry.time} · 估算中
+        {entry.time} · {t("ql.estimating")}
       </span>
     ) : entry.estimate === "failed" ? (
-      <span className="wt:text-danger">{entry.time} · 没估算出来</span>
+      <span className="wt:text-danger">
+        {entry.time} · {t("tc.estimateFailed")}
+      </span>
     ) : (
       <>
         {entry.time}
-        {entry.kind === "move" ? ` · ${entry.minutes} 分钟` : ""}
+        {entry.kind === "move" && (
+          <span>
+            {" · "}
+            {t("wt.minutes", { count: entry.minutes })}
+          </span>
+        )}
       </>
     );
   return (
@@ -368,10 +383,10 @@ function Row({ entry, highlighted, onClick }: { entry: Entry; highlighted: boole
         <small className="wt:text-ink-3 wt:block wt:text-[11px]">{note}</small>
       </span>
       {entry.estimate === "pending" ? (
-        <span className="wt:bg-track wt:h-3 wt:w-[38px] wt:animate-pulse wt:rounded-full" aria-label="估算中" />
+        <span className="wt:bg-track wt:h-3 wt:w-[38px] wt:animate-pulse wt:rounded-full" aria-label={t("ql.estimating")} />
       ) : entry.estimate === "failed" ? (
         <span className="wt:bg-accent-soft wt:text-accent-text wt:flex wt:h-7 wt:items-center wt:rounded-full wt:px-[11px] wt:text-[12.5px] wt:font-[650]">
-          填热量
+          {t("dl.fillKcal")}
         </span>
       ) : (
         <span className={cn("wt:text-[14px] wt:font-semibold wt:tabular-nums", entry.kind === "move" && "wt:text-info")}>
@@ -408,6 +423,7 @@ function SwipeRow({
   onDelete(): void;
   children: ReactNode;
 }) {
+  const { t } = useI18n(messages);
   const [dx, setDx] = useState<number | null>(null);
   const start = useRef<{ x: number; y: number; base: number; locked?: "x" | "y" } | null>(null);
   const width = useRef(0);
@@ -453,7 +469,8 @@ function SwipeRow({
           }}
           className="wt:bg-ink-3 wt:grid wt:w-16 wt:place-content-center wt:justify-items-center wt:gap-0.5 wt:text-[11px] wt:text-white"
         >
-          <Pencil className="wt:size-[17px]" />改
+          <Pencil className="wt:size-[17px]" />
+          {t("hero.swipeEdit")}
         </button>
         <button
           type="button"
@@ -465,7 +482,8 @@ function SwipeRow({
           className="wt:bg-danger wt:grid wt:w-16 wt:place-content-center wt:justify-items-center wt:gap-0.5 wt:text-[11px] wt:text-white"
           style={offset < -ACTIONS ? { width: -offset - 64 } : undefined}
         >
-          <Trash2 className="wt:size-[17px]" />删除
+          <Trash2 className="wt:size-[17px]" />
+          {t("common.delete")}
         </button>
       </div>
       <div

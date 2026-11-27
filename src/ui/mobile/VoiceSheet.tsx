@@ -4,12 +4,14 @@
  */
 import { useEffect, useState } from "react";
 import { useQueryClient } from "@tanstack/react-query";
+import { useI18n } from "@tau/plugins";
 import { Sparkles, X } from "lucide-react";
 import { cn, toast } from "@tau/ui";
-import { aiErrorMessage } from "../../ai";
+import { aiErrorKey } from "../../ai";
 import { dateKey, timeKey } from "../../data/model";
 import { splitSpeech, type OrganizedItem } from "../../data/parse";
 import { useRuntime } from "../../runtime";
+import { messages, type MessageKey } from "../../i18n";
 import { addEntries } from "./actions";
 import { KindIcon, PrimaryButton, Stepper } from "./parts";
 import { Sheet } from "./Sheet";
@@ -23,10 +25,11 @@ export interface VoiceRequest {
   kg: number | null;
 }
 
-type Phase = { state: "organizing" } | { state: "ready"; advice: string } | { state: "fallback"; reason: string };
+type Phase = { state: "organizing" } | { state: "ready"; advice: string } | { state: "fallback"; key: MessageKey };
 
 export function VoiceSheet({ request, onClose }: { request: VoiceRequest | null; onClose(): void }) {
   const runtime = useRuntime();
+  const { t } = useI18n(messages);
   const client = useQueryClient();
   const [items, setItems] = useState<OrganizedItem[]>([]);
   const [phase, setPhase] = useState<Phase>({ state: "organizing" });
@@ -54,9 +57,9 @@ export function VoiceSheet({ request, onClose }: { request: VoiceRequest | null;
       })
       .catch(error => {
         if (controller.signal.aborted) return;
-        const message = aiErrorMessage(error);
-        if (message === null) return;
-        setPhase({ state: "fallback", reason: `${message}，热量记下后在后台估算` });
+        const key = aiErrorKey(error);
+        if (key === null) return;
+        setPhase({ state: "fallback", key });
       });
     return () => controller.abort();
   }, [request, runtime.ai]);
@@ -82,10 +85,10 @@ export function VoiceSheet({ request, onClose }: { request: VoiceRequest | null;
       for (const item of items)
         if (phase.state === "ready" && item.kind === "food" && item.kcal != null)
           await runtime.data.rememberFood(item.text, item.kcal);
-      toast.success(`已记下 ${items.length} 条`);
+      toast.success(t("vs.savedToast", { count: items.length }));
       onClose();
     } catch {
-      toast.error("记录失败");
+      toast.error(t("common.logFailed"));
     } finally {
       setSaving(false);
     }
@@ -99,11 +102,11 @@ export function VoiceSheet({ request, onClose }: { request: VoiceRequest | null;
     <Sheet
       open={request != null}
       onClose={onClose}
-      title={organizing ? "正在整理" : `整理成 ${items.length} 条`}
+      title={organizing ? t("vs.organizing") : t("vs.titleCount", { count: items.length })}
       trailing={organizing ? <Dots /> : null}
     >
       <p className="wt:text-ink-3 wt:mb-1.5 wt:text-[12px] wt:leading-[1.6]">
-        听到：<span className="wt:text-ink-2">{request?.text}</span>
+        {t("vs.heard")}<span className="wt:text-ink-2">{request?.text}</span>
       </p>
       <ul className="wt:divide-y wt:divide-line-2">
         {items.map((item, index) => (
@@ -123,20 +126,25 @@ export function VoiceSheet({ request, onClose }: { request: VoiceRequest | null;
                 <span className="wt:block wt:truncate wt:text-[14px]">{item.text}</span>
                 <small className="wt:text-ink-3 wt:text-[11px]">
                   {item.time ?? request?.now}
-                  {item.kind === "move" ? ` · ${item.minutes} 分钟` : ""}
+                  {item.kind === "move" && (
+                    <span>
+                      {" · "}
+                      {t("wt.minutes", { count: item.minutes })}
+                    </span>
+                  )}
                 </small>
               </button>
             )}
             {organizing ? (
-              <span className="wt:bg-track wt:h-3 wt:w-10 wt:animate-pulse wt:rounded-full" aria-label="估算中" />
+              <span className="wt:bg-track wt:h-3 wt:w-10 wt:animate-pulse wt:rounded-full" aria-label={t("ql.estimating")} />
             ) : phase.state === "ready" && item.kcal != null ? (
-              <Stepper value={item.kcal} onChange={kcal => patch(index, { kcal })} label={`${item.text} 的热量`} />
+              <Stepper value={item.kcal} onChange={kcal => patch(index, { kcal })} label={t("vs.kcalAria", { text: item.text })} />
             ) : (
-              <span className="wt:text-ink-3 wt:text-[11.5px]">后台估算</span>
+              <span className="wt:text-ink-3 wt:text-[11.5px]">{t("vs.background")}</span>
             )}
             <button
               type="button"
-              aria-label={`去掉 ${item.text}`}
+              aria-label={t("vs.removeAria", { name: item.text })}
               onClick={() => setItems(list => list.filter((_, i) => i !== index))}
               className="wt:text-ink-3 wt:grid wt:size-8 wt:shrink-0 wt:place-items-center"
             >
@@ -153,18 +161,18 @@ export function VoiceSheet({ request, onClose }: { request: VoiceRequest | null;
           )}
         >
           <Sparkles className="wt:text-accent-text wt:mt-[3px] wt:size-3.5 wt:shrink-0" />
-          <span>{organizing ? "热量算好后给出评估…" : phase.advice || "已按你说的整理好。"}</span>
+          <span>{organizing ? t("vs.advicePending") : phase.advice || t("vs.adviceFallback")}</span>
         </div>
       ) : (
-        <p className="wt:text-ink-3 wt:my-3 wt:text-[12px]">{phase.reason}</p>
+        <p className="wt:text-ink-3 wt:my-3 wt:text-[12px]">{t("vs.fallbackReason", { message: t(phase.key) })}</p>
       )}
       {organizing ? (
         <PrimaryButton ghost disabled={!items.length || saving} onClick={() => void save()}>
-          先记下，后台算
+          {t("vs.saveNowBg")}
         </PrimaryButton>
       ) : (
         <PrimaryButton disabled={!items.length || saving} onClick={() => void save()}>
-          全部记下
+          {t("vs.saveAll")}
         </PrimaryButton>
       )}
     </Sheet>

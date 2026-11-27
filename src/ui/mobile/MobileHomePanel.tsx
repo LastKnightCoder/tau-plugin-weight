@@ -3,11 +3,12 @@
  * 早上还没称时换成「起床称一下」。用户在引导里关掉了今天页卡片时不显示。
  */
 import { useState } from "react";
-import type { PluginHomePanelProps } from "@tau/plugins";
+import { useI18n, type PluginHomePanelProps } from "@tau/plugins";
 import { Plus, Scale } from "lucide-react";
 import { cn } from "@tau/ui";
 import { dateKey } from "../../data/model";
 import { useRuntime } from "../../runtime";
+import { messages } from "../../i18n";
 import { kg, signed } from "../bits";
 import { useLedger, useNow, usePrefs } from "../queries";
 import { defaultWeigh, isLateNight, isMorning } from "../weighing";
@@ -16,23 +17,24 @@ import { WeighSheet, type WeighTarget } from "./WeighSheet";
 
 export function MobileHomePanel({ registerDismiss }: PluginHomePanelProps) {
   const { pages } = useRuntime();
+  const { t } = useI18n(messages);
   const { today } = useNow();
   const query = useLedger(14, today);
   const prefs = usePrefs();
   const [weigh, setWeigh] = useState<WeighTarget | null>(null);
   if (!query.data || !prefs.data || !prefs.data.homeCard) return null;
   const { overview: o, ledger } = query.data;
-  const t = o.today;
+  const day = o.today;
   const now = new Date();
   const morning = isMorning(now);
-  const needWeigh = morning && t.am == null;
-  const delta = t.am != null && o.yesterday?.am != null ? t.am - o.yesterday.am : null;
+  const needWeigh = morning && day.am == null;
+  const delta = day.am != null && o.yesterday?.am != null ? day.am - o.yesterday.am : null;
 
   // 凌晨不指定时段，由 defaultWeigh 归到昨天睡前
   const openWeigh = () => {
     const now = new Date();
     const morning = isMorning(now);
-    const slot = isLateNight(now) ? undefined : morning || t.am == null ? "am" : "pm";
+    const slot = isLateNight(now) ? undefined : morning || day.am == null ? "am" : "pm";
     setWeigh({ ...defaultWeigh(now, ledger, slot), today: dateKey(now), ledger, avg: o.latestAvg });
   };
 
@@ -42,19 +44,20 @@ export function MobileHomePanel({ registerDismiss }: PluginHomePanelProps) {
       <div className="wt:flex wt:min-h-[96px] wt:flex-1 wt:flex-col">
         {needWeigh ? (
           <>
-            <b className="wt:mt-1.5 wt:text-[18px] wt:font-[750]">起床称一下</b>
+            <b className="wt:mt-1.5 wt:text-[18px] wt:font-[750]">{t("mhp.wakeTitle")}</b>
             <span className="wt:text-ink-2 wt:mt-0.5 wt:text-[11.5px]">
-              昨天晨重 <b className="wt:tabular-nums">{kg(o.yesterday?.am)}</b> · 均值 {kg(o.latestAvg)}
+              {t("mhp.yAm")} <b className="wt:tabular-nums">{kg(o.yesterday?.am)}</b> · {t("tc.avgWord")} {kg(o.latestAvg)}
             </span>
           </>
         ) : (
           <>
-            <b className={cn("wt:mt-1 wt:text-[25px] wt:leading-[1.1] wt:font-[750] wt:tracking-[-0.03em] wt:tabular-nums", t.budget > 0 && t.remaining < 0 && "wt:text-danger")}>
-              {t.budget > 0 ? Math.abs(t.remaining) : t.intake}
+            <b className={cn("wt:mt-1 wt:text-[25px] wt:leading-[1.1] wt:font-[750] wt:tracking-[-0.03em] wt:tabular-nums", day.budget > 0 && day.remaining < 0 && "wt:text-danger")}>
+              {day.budget > 0 ? Math.abs(day.remaining) : day.intake}
               <small className="wt:text-ink-3 wt:ml-0.5 wt:text-[11px] wt:font-medium wt:tracking-normal">kcal</small>
             </b>
             <span className="wt:text-ink-2 wt:mt-0.5 wt:truncate wt:text-[11.5px]">
-              {t.budget > 0 ? (t.remaining < 0 ? "超预算" : "还能吃") : "今天已吃"} · 晨重 <b className="wt:tabular-nums">{kg(t.am)}</b>
+              {day.budget > 0 ? (day.remaining < 0 ? t("mhp.overBudget") : t("wc.left")) : t("mhp.eatenToday")} · {t("wt.legend.am")}{" "}
+              <b className="wt:tabular-nums">{kg(day.am)}</b>
               {delta != null && <span className={delta <= 0 ? "wt:text-info" : "wt:text-danger"}> {signed(delta)}</span>}
             </span>
           </>
@@ -69,7 +72,7 @@ export function MobileHomePanel({ registerDismiss }: PluginHomePanelProps) {
             className={cn(button, needWeigh ? "wt:bg-accent wt:text-ink-inverse" : "wt:bg-hover wt:text-ink-1")}
           >
             <Scale />
-            称重
+            {t("mhp.weighBtn")}
           </button>
           {!needWeigh && (
             <button
@@ -81,7 +84,7 @@ export function MobileHomePanel({ registerDismiss }: PluginHomePanelProps) {
               className={cn(button, "wt:bg-accent-soft wt:text-accent-text")}
             >
               <Plus />
-              记一笔
+              {t("common.logBtn")}
             </button>
           )}
         </span>

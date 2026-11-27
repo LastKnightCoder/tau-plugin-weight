@@ -3,13 +3,17 @@
  * 「做到了，第二天轻多少」四组对比、AI 分析（点了才请求，数据变了只提示可能过时）。
  */
 import { useEffect, useMemo, useRef, useState, type PointerEvent } from "react";
+import { useI18n } from "@tau/plugins";
 import { RefreshCw, Sparkles } from "lucide-react";
 import { cn } from "@tau/ui";
-import { aiErrorMessage, needsSetup, type AIScope, type AnalysisInput } from "../../ai";
+import { aiErrorKey, needsSetup, type AIScope, type AnalysisInput } from "../../ai";
 import { addDays, type WeighSlot } from "../../data/model";
 import { compareGroups, type DaySummary, type GroupStat, type Ledger } from "../../data/stats";
 import { useRuntime } from "../../runtime";
-import { FOOD_COLOR, GAIN_COLOR, LOSE_COLOR, MOVE_COLOR, dayLabel, kg, shortDate, signed, useWidth } from "../bits";
+import { messages, type MessageKey } from "../../i18n";
+
+const GROUP_KEYS = { both: "ig.groupBoth", eat: "ig.groupEat", move: "ig.groupMove", none: "ig.groupNone" } as const;
+import { FOOD_COLOR, GAIN_COLOR, LOSE_COLOR, MOVE_COLOR, WEEKDAYS, dayLabel, kg, shortDate, signed, useWidth } from "../bits";
 import { Rendered } from "../AIPanel";
 import { MCard, PrimaryButton } from "./parts";
 
@@ -35,6 +39,7 @@ export function TrendView({
   /** 补记或修改某天的体重 */
   onWeigh(date: string, slot: WeighSlot): void;
 }) {
+  const { t } = useI18n(messages);
   const [range, setRange] = useState<Range>(30);
   const days = useMemo(() => ledger.days.filter(d => d.date > addDays(today, -range)), [ledger, range, today]);
   const values = days.map(d => d.avg).filter((v): v is number => v != null);
@@ -44,45 +49,46 @@ export function TrendView({
     <div className="wt:flex wt:flex-col wt:gap-3 wt:pt-1 wt:pb-6">
       <MCard>
         <div className="wt:mb-1.5 wt:flex wt:items-center">
-          <h2 className="wt:text-[13.5px] wt:font-[650]">体重</h2>
+          <h2 className="wt:text-[13.5px] wt:font-[650]">{t("wt.weightTitle")}</h2>
           <span className="wt:flex-1" />
           <Pills<Range>
             value={range}
             onChange={setRange}
             options={[
-              [14, "2 周"],
-              [30, "月"],
-              [90, "3 月"],
+              [14, t("wt.range2w")],
+              [30, t("wt.rangeMonth")],
+              [90, t("wt.range3m")],
             ]}
           />
         </div>
         <div className="wt:text-ink-2 wt:mb-2.5 wt:flex wt:gap-4 wt:text-[12px]">
           <span>
-            7 日均值 <b className="wt:text-ink-1 wt:tabular-nums">{kg(latest)}</b>
+            {t("wt.legend.avg")} <b className="wt:text-ink-1 wt:tabular-nums">{kg(latest)}</b>
           </span>
           {change != null && (
             <span>
-              {range} 天 <b className={cn("wt:tabular-nums", change <= 0 ? "wt:text-info" : "wt:text-danger")}>{signed(change)}</b>
+              {t("common.days", { count: range })}{" "}
+              <b className={cn("wt:tabular-nums", change <= 0 ? "wt:text-info" : "wt:text-danger")}>{signed(change)}</b>
             </span>
           )}
           {goal != null && latest != null && (
             <span>
-              距目标 <b className="wt:text-ink-1 wt:tabular-nums">{Math.max(0, latest - goal).toFixed(1)}</b>
+              {t("wc.toGoal")} <b className="wt:text-ink-1 wt:tabular-nums">{Math.max(0, latest - goal).toFixed(1)}</b>
             </span>
           )}
         </div>
         {days.some(d => d.am != null || d.foodCount) ? (
           <TouchChart days={days} goal={goal} today={today} onBackfill={date => onWeigh(date, "am")} />
         ) : (
-          <p className="wt:text-ink-3 wt:grid wt:h-[180px] wt:place-items-center wt:text-[12.5px]">明早起床称一次，趋势从这里开始</p>
+          <p className="wt:text-ink-3 wt:grid wt:h-[180px] wt:place-items-center wt:text-[12.5px]">{t("wt.trendEmpty")}</p>
         )}
         <div className="wt:text-ink-2 wt:mt-2 wt:flex wt:flex-wrap wt:gap-x-3 wt:gap-y-1 wt:text-[11px]">
-          <Legend swatch={<i className="wt:bg-accent wt:h-0.5 wt:w-3.5 wt:rounded-full" />}>7 日均值</Legend>
+          <Legend swatch={<i className="wt:bg-accent wt:h-0.5 wt:w-3.5 wt:rounded-full" />}>{t("wt.legend.avg")}</Legend>
           {goal != null && (
-            <Legend swatch={<i className="wt:h-0 wt:w-3.5 wt:border-t-[1.5px] wt:border-dashed wt:border-ok" />}>目标</Legend>
+            <Legend swatch={<i className="wt:h-0 wt:w-3.5 wt:border-t-[1.5px] wt:border-dashed wt:border-ok" />}>{t("wt.legend.goal")}</Legend>
           )}
-          <Legend swatch={<i className="wt:h-2.5 wt:w-2 wt:rounded-[2px]" style={{ background: FOOD_COLOR }} />}>没超预算</Legend>
-          <Legend swatch={<i className="wt:bg-ink-3 wt:h-2.5 wt:w-2 wt:rounded-[2px] wt:opacity-45" />}>超预算</Legend>
+          <Legend swatch={<i className="wt:h-2.5 wt:w-2 wt:rounded-[2px]" style={{ background: FOOD_COLOR }} />}>{t("wt.legend.under")}</Legend>
+          <Legend swatch={<i className="wt:bg-ink-3 wt:h-2.5 wt:w-2 wt:rounded-[2px] wt:opacity-45" />}>{t("wt.legend.over")}</Legend>
         </div>
       </MCard>
       <HabitCard ledger={ledger} today={today} moveGoal={moveGoal} budgetKnown={budgetKnown} onWeigh={onWeigh} />
@@ -145,6 +151,7 @@ function TouchChart({
   today: string;
   onBackfill(date: string): void;
 }) {
+  const { t } = useI18n(messages);
   const [ref, width] = useWidth<HTMLDivElement>();
   const [scrub, setScrub] = useState<number | null>(null);
   const [linger, setLinger] = useState<number | null>(null);
@@ -238,8 +245,8 @@ function TouchChart({
           )}
           style={{ left: Math.min(Math.max(0, x(shown!) - 70), Math.max(0, width - 170)) }}
         >
-          {d.date === today ? "今天" : dayLabel(d.date)} · 晨重{" "}
-          {d.am != null ? <b className="wt:text-[13px] wt:tabular-nums">{kg(d.am)}</b> : <b>没称</b>}
+          {d.date === today ? t("date.today") : dayLabel(t, d.date)} · {t("wt.legend.am")}{" "}
+          {d.am != null ? <b className="wt:text-[13px] wt:tabular-nums">{kg(d.am)}</b> : <b>{t("wd.notWeighed")}</b>}
           {d.am == null && (
             <button
               type="button"
@@ -250,15 +257,16 @@ function TouchChart({
               }}
               className="wt:text-accent-soft wt:ml-2 wt:font-[650]"
             >
-              补记 ›
+              {t("tv.backfill")}
             </button>
           )}
           <br />
-          均值 {kg(d.avg)} · {d.foodCount ? `吃了 ${d.intake} kcal${d.eat === "miss" ? "（超）" : ""}` : "饮食没记"}
+          {t("tc.avgWord")} {kg(d.avg)} ·{" "}
+          {d.foodCount ? `${t("tc.ateAmount", { intake: d.intake })} kcal${d.eat === "miss" ? t("tc.ateOverSuffix") : ""}` : t("ig.cellNotLogged")}
         </div>
       )}
       {width > 0 && (
-        <svg width={width} height={height} aria-label="体重与每日摄入趋势" role="img" className="wt:block">
+        <svg width={width} height={height} aria-label={t("wt.chartAria")} role="img" className="wt:block">
           {[0, 0.5, 1].map(t => {
             const v = hi - t * (hi - lo);
             return (
@@ -326,6 +334,7 @@ function HabitCard({
   budgetKnown: boolean;
   onWeigh(date: string, slot: WeighSlot): void;
 }) {
+  const { t } = useI18n(messages);
   const [picked, setPicked] = useState<string | null>(null);
   const weekday = (new Date(`${today}T00:00:00`).getDay() + 6) % 7;
   const firstMonday = addDays(today, -weekday - (WEEKS - 1) * 7);
@@ -334,14 +343,14 @@ function HabitCard({
   return (
     <MCard>
       <div className="wt:mb-2 wt:flex wt:items-baseline wt:gap-1.5">
-        <h2 className="wt:text-[13.5px] wt:font-[650]">打卡</h2>
-        <small className="wt:text-ink-3 wt:text-[11.5px]">由记录自动判定</small>
+        <h2 className="wt:text-[13.5px] wt:font-[650]">{t("ig.title")}</h2>
+        <small className="wt:text-ink-3 wt:text-[11.5px]">{t("tv.autoNote")}</small>
       </div>
       <div className="wt:grid wt:grid-cols-[30px_repeat(7,minmax(0,1fr))] wt:items-center wt:gap-1">
         <span />
-        {"一二三四五六日".split("").map(c => (
-          <span key={c} className="wt:text-ink-3 wt:text-center wt:text-[10.5px]">
-            {c}
+        {WEEKDAYS.map(w => (
+          <span key={w} className="wt:text-ink-3 wt:text-center wt:text-[10.5px]">
+            {t(w)}
           </span>
         ))}
         {rows.map(monday => (
@@ -351,14 +360,16 @@ function HabitCard({
       <p className="wt:text-ink-2 wt:mt-2.5 wt:min-h-[18px] wt:text-[12px]">
         {day ? (
           <>
-            {dayLabel(day.date)} · 晨重 {kg(day.am)} · {day.foodCount ? `吃了 ${day.intake}` : "饮食没记"} · 运动 {day.moveMinutes} 分钟
+            {dayLabel(t, day.date)} · {t("wt.legend.am")} {kg(day.am)} ·{" "}
+            {day.foodCount ? t("tc.ateAmount", { intake: day.intake }) : t("ig.cellNotLogged")} ·{" "}
+            {t("ig.cellMove", { minutes: day.moveMinutes })}
             {(day.am == null || day.pm == null) && (
               <button
                 type="button"
                 onClick={() => onWeigh(day.date, day.am == null ? "am" : "pm")}
                 className="wt:text-accent-text wt:ml-2 wt:font-semibold"
               >
-                补称重
+                {t("tv.backfillWeigh")}
               </button>
             )}
           </>
@@ -366,11 +377,12 @@ function HabitCard({
           <span className="wt:text-ink-3 wt:inline-flex wt:flex-wrap wt:gap-x-3">
             <span className="wt:inline-flex wt:items-center wt:gap-1">
               <Dot color={FOOD_COLOR} filled />
-              少吃{budgetKnown ? "" : "（填身体数据后判定）"}
+              {t("tv.eatLess")}
+              {budgetKnown ? "" : t("ig.needsProfile")}
             </span>
             <span className="wt:inline-flex wt:items-center wt:gap-1">
               <Dot color={MOVE_COLOR} filled />
-              多动 · 满 {moveGoal} 分钟
+              {t("tv.moveMore", { goal: moveGoal })}
             </span>
           </span>
         )}
@@ -392,6 +404,7 @@ function Week({
   picked: string | null;
   onPick(date: string | null): void;
 }) {
+  const { t } = useI18n(messages);
   return (
     <>
       <span className="wt:text-ink-3 wt:text-[10px] wt:tabular-nums">{shortDate(monday)}</span>
@@ -403,7 +416,7 @@ function Week({
           <button
             key={date}
             type="button"
-            aria-label={dayLabel(date)}
+            aria-label={dayLabel(t, date)}
             aria-pressed={picked === date}
             onClick={() => onPick(picked === date ? null : date)}
             className={cn(
@@ -434,16 +447,17 @@ function Dot({ color, filled }: { color: string; filled: boolean }) {
 const MIN_SAMPLE = 5;
 
 function GroupCard({ groups }: { groups: GroupStat[] }) {
+  const { t } = useI18n(messages);
   const max = Math.max(0.2, ...groups.map(g => Math.abs(g.mean ?? 0)));
   const [both, eat, move, none] = groups;
   const enough = (g: GroupStat) => g.days >= MIN_SAMPLE && g.mean != null;
   const parts: string[] = [];
-  if (enough(eat) && enough(move)) parts.push(eat.mean! < move.mean! ? "对你来说少吃比多动管用" : "对你来说多动比少吃管用");
-  if (enough(both) && groups.filter(enough).every(g => g === both || both.mean! <= g.mean!)) parts.push("两样都做到效果最好");
-  if (enough(none) && none.mean! > 0) parts.push("都没做的日子第二天会涨");
+  if (enough(eat) && enough(move)) parts.push(eat.mean! < move.mean! ? t("ig.conclusion.eatVsMove1") : t("ig.conclusion.eatVsMove2"));
+  if (enough(both) && groups.filter(enough).every(g => g === both || both.mean! <= g.mean!)) parts.push(t("ig.conclusion.bothBest"));
+  if (enough(none) && none.mean! > 0) parts.push(t("ig.conclusion.noneGains"));
   return (
     <MCard>
-      <h2 className="wt:mb-1 wt:text-[13.5px] wt:font-[650]">做到了，第二天轻多少</h2>
+      <h2 className="wt:mb-1 wt:text-[13.5px] wt:font-[650]">{t("ig.title2")}</h2>
       {groups.map(g => {
         const v = g.mean ?? 0;
         const w = (Math.abs(v) / max) * (v < 0 ? 62 : 38);
@@ -452,7 +466,7 @@ function GroupCard({ groups }: { groups: GroupStat[] }) {
             <span className="wt:flex wt:items-center wt:gap-[3px] wt:text-[12.5px]">
               <Dot color={FOOD_COLOR} filled={g.id === "both" || g.id === "eat"} />
               <Dot color={MOVE_COLOR} filled={g.id === "both" || g.id === "move"} />
-              <span className="wt:ml-1">{g.name}</span>
+              <span className="wt:ml-1">{t(GROUP_KEYS[g.id])}</span>
             </span>
             <span className="wt:relative wt:h-3">
               <i className="wt:bg-line-1 wt:absolute wt:-top-2 wt:-bottom-2 wt:left-[62%] wt:w-px" />
@@ -469,14 +483,14 @@ function GroupCard({ groups }: { groups: GroupStat[] }) {
             </span>
             <span className="wt:text-right wt:text-[13px] wt:font-semibold wt:tabular-nums" style={{ color: g.mean == null ? undefined : v < 0 ? LOSE_COLOR : GAIN_COLOR }}>
               {g.mean == null ? "—" : signed(g.mean, 2)}
-              <small className="wt:text-ink-3 wt:block wt:text-[10.5px] wt:font-normal">{g.days} 天</small>
+              <small className="wt:text-ink-3 wt:block wt:text-[10.5px] wt:font-normal">{t("common.days", { count: g.days })}</small>
             </span>
           </div>
         );
       })}
       <p className="wt:text-ink-2 wt:pt-1 wt:text-[12.5px] wt:leading-[1.7]">
-        次日晨重减当日晨重的平均值。
-        {groups.some(enough) ? `${parts.join("，") || "目前各组差别不大"}。` : "坚持记录两三周，就能看出少吃和多动各自的效果。"}
+        {t("ig.conclusion.prefix")}
+        {groups.some(enough) ? `${parts.join(t("ig.joiner")) || t("ig.conclusion.tail")}${t("ig.period")}` : t("ig.conclusion.keep")}
       </p>
     </MCard>
   );
@@ -484,9 +498,10 @@ function GroupCard({ groups }: { groups: GroupStat[] }) {
 
 function AICard({ input, stamp }: { input: AnalysisInput; stamp: string }) {
   const { ai, context } = useRuntime();
+  const { t } = useI18n(messages);
   const [scope, setScope] = useState<AIScope>("today");
   const [results, setResults] = useState<Partial<Record<AIScope, { text: string; stamp: string; done: boolean }>>>({});
-  const [error, setError] = useState<{ scope: AIScope; message: string; setup: boolean } | null>(null);
+  const [error, setError] = useState<{ scope: AIScope; key: MessageKey; setup: boolean } | null>(null);
   const [running, setRunning] = useState<AIScope | null>(null);
   const [contentHeight, setContentHeight] = useState(0);
   const content = useRef<HTMLDivElement>(null);
@@ -519,8 +534,8 @@ function AICard({ input, stamp }: { input: AnalysisInput; stamp: string }) {
         delete next[target];
         return next;
       });
-      const message = aiErrorMessage(err);
-      if (message) setError({ scope: target, message, setup: needsSetup(err) });
+      const key = aiErrorKey(err);
+      if (key) setError({ scope: target, key, setup: needsSetup(err) });
     } finally {
       if (controller.current === current) {
         controller.current = null;
@@ -536,7 +551,7 @@ function AICard({ input, stamp }: { input: AnalysisInput; stamp: string }) {
     <MCard>
       <div className="wt:mb-2 wt:flex wt:items-center wt:gap-1.5">
         <Sparkles className="wt:text-accent wt:size-[15px]" />
-        <h2 className="wt:text-[13.5px] wt:font-[650]">AI 分析</h2>
+        <h2 className="wt:text-[13.5px] wt:font-[650]">{t("ai.mobileTitle")}</h2>
         <span className="wt:flex-1" />
         <Pills<AIScope>
           value={scope}
@@ -545,8 +560,8 @@ function AICard({ input, stamp }: { input: AnalysisInput; stamp: string }) {
             setContentHeight(0);
           }}
           options={[
-            ["today", "今天"],
-            ["week", "本周"],
+            ["today", t("date.today")],
+            ["week", t("ai.week")],
           ]}
         />
       </div>
@@ -556,11 +571,11 @@ function AICard({ input, stamp }: { input: AnalysisInput; stamp: string }) {
             <Rendered text={result.text} streaming={streaming} />
             {stale && (
               <div className="wt:text-ink-3 wt:mt-2.5 wt:flex wt:items-center wt:gap-1.5 wt:text-[12px]">
-                记录有变化，结果可能过时
+                {t("ai.staleMobile")}
                 <span className="wt:flex-1" />
                 <PrimaryButton small ghost disabled={running !== null} onClick={() => void run()}>
                   <RefreshCw />
-                  重新分析
+                  {t("ai.rerun")}
                 </PrimaryButton>
               </div>
             )}
@@ -568,12 +583,12 @@ function AICard({ input, stamp }: { input: AnalysisInput; stamp: string }) {
         ) : (
           <p className="wt:text-ink-3 wt:text-[13px] wt:leading-[1.7]">
             {streaming
-              ? "正在分析，请稍候…"
+              ? t("ai.analyzing")
               : visibleError
-                ? visibleError.message
+                ? t(visibleError.key)
                 : scope === "today"
-                  ? "看看晚饭还能吃多少、运动还差多少。点了才分析，不会自动消耗额度。"
-                  : "总结最近两周的趋势，找出容易破功的规律。"}
+                  ? t("tv.aiTodayHint")
+                  : t("ai.weekHint")}
           </p>
         )}
         {!result?.done && (
@@ -583,11 +598,11 @@ function AICard({ input, stamp }: { input: AnalysisInput; stamp: string }) {
             onClick={() => (visibleError?.setup ? void context.ai.openSettings() : void run())}
           >
             {visibleError?.setup ? (
-              "去配置模型"
+              t("common.configureModel")
             ) : (
               <>
                 <Sparkles />
-                {streaming ? "分析中…" : visibleError ? "重试" : scope === "today" ? "分析今天" : "分析本周"}
+                {streaming ? t("ai.running") : visibleError ? t("common.retry") : scope === "today" ? t("ai.analyzeToday") : t("ai.analyzeWeek")}
               </>
             )}
           </PrimaryButton>

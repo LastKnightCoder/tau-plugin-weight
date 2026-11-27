@@ -2,64 +2,67 @@
  * 首页「减重」卡：今天晨重（没称时给称重入口）、还能吃多少 kcal、运动进度，下面是一句话记录。
  */
 import type { ReactNode } from "react";
+import { useI18n } from "@tau/plugins";
 import { cn } from "@tau/ui";
 import { useRuntime } from "../runtime";
+import { messages } from "../i18n";
 import { Delta, MOVE_COLOR, kg } from "./bits";
 import { QuickLog } from "./QuickLog";
 import { useLedger, useNow } from "./queries";
 
 export function HomePanel() {
   const { pages } = useRuntime();
+  const { t } = useI18n(messages);
   const { today } = useNow();
   const query = useLedger(14, today);
   if (!query.data) return null;
   const { overview: o, profile } = query.data;
-  const t = o.today;
+  const day = o.today;
   const moveGoal = profile?.moveGoal ?? 30;
-  const delta = t.am != null && o.yesterday?.am != null ? t.am - o.yesterday.am : null;
-  const hasBudget = t.budget > 0;
-  const over = hasBudget && t.remaining < 0;
+  const delta = day.am != null && o.yesterday?.am != null ? day.am - o.yesterday.am : null;
+  const hasBudget = day.budget > 0;
+  const over = hasBudget && day.remaining < 0;
   const unit = (text: string) => <small className="wt:text-ink-3 wt:ml-1 wt:text-[11px] wt:font-normal">{text}</small>;
   return (
     <div className="wt:flex wt:flex-col wt:gap-3">
       <div className="wt:grid wt:grid-cols-3 wt:gap-4">
         <Stat
-          label="晨重"
-          foot={t.am == null ? "今天还没称" : <>较昨天 <Delta value={delta} suffix=" kg"/></>}
+          label={t("wt.legend.am")}
+          foot={day.am == null ? t("hp.notWeighedToday") : <>{t("hp.vsYesterday")} <Delta value={delta} suffix=" kg"/></>}
         >
-          {t.am == null ? (
+          {day.am == null ? (
             <button
               type="button"
               onClick={() => void pages.main?.open({ weigh: "am" })}
               className="wt:text-accent-text wt:hover:underline wt:text-[14px] wt:font-medium"
             >
-              ＋ 称一下
+              {t("hp.weighCta")}
             </button>
           ) : (
             <>
-              {kg(t.am)}
+              {kg(day.am)}
               {unit("kg")}
             </>
           )}
         </Stat>
-        <Stat label={over ? "已超预算" : "还能吃"} danger={over} foot={hasBudget ? `已吃 ${t.intake} kcal` : "未设热量预算"}>
-          {hasBudget ? Math.abs(t.remaining) : t.intake}
+        <Stat label={over ? t("hp.overBudget") : t("wc.left")} danger={over} foot={hasBudget ? t("hp.eaten", { intake: day.intake }) : t("hp.noBudget")}>
+          {hasBudget ? Math.abs(day.remaining) : day.intake}
           {unit("kcal")}
         </Stat>
         <Stat
-          label="运动"
+          label={t("dl.move")}
           foot={
             <div className="wt:bg-track wt:h-1.5 wt:w-full wt:overflow-hidden wt:rounded-full">
-              <div className="wt:h-full wt:rounded-full" style={{ width: `${Math.min(100, (t.moveMinutes / moveGoal) * 100)}%`, background: MOVE_COLOR }} />
+              <div className="wt:h-full wt:rounded-full" style={{ width: `${Math.min(100, (day.moveMinutes / moveGoal) * 100)}%`, background: MOVE_COLOR }} />
             </div>
           }
         >
-          {t.moveMinutes}
-          {unit(`/ ${moveGoal} 分钟`)}
+          {day.moveMinutes}
+          {unit(t("wc.moveUnit", { goal: moveGoal }))}
         </Stat>
       </div>
       <QuickLog
-        remaining={t.budget > 0 ? t.remaining : null}
+        remaining={day.budget > 0 ? day.remaining : null}
         kg={o.latestAvg}
         hasProfile={profile != null}
       />

@@ -4,12 +4,15 @@
  */
 import { useEffect, useState } from "react";
 import { useQueryClient } from "@tanstack/react-query";
+import { useI18n } from "@tau/plugins";
 import { Button, DatePicker, Dialog, DialogBody, FormField, Input, toast } from "@tau/ui";
 import type { Entry } from "../data/model";
 import { WEIGHT_KEY, useRuntime } from "../runtime";
+import { messages } from "../i18n";
 
 export function EntryDialog({ entry, today, onClose }: { entry: Entry | null; today: string; onClose(): void }) {
   const runtime = useRuntime();
+  const { t } = useI18n(messages);
   const client = useQueryClient();
   const [text, setText] = useState("");
   const [time, setTime] = useState("");
@@ -54,7 +57,7 @@ export function EntryDialog({ entry, today, onClose }: { entry: Entry | null; to
       await client.invalidateQueries({ queryKey: WEIGHT_KEY });
       onClose();
     } catch {
-      toast.error("修改失败");
+      toast.error(t("common.updateFailed"));
     } finally {
       setSaving(false);
     }
@@ -64,22 +67,22 @@ export function EntryDialog({ entry, today, onClose }: { entry: Entry | null; to
     <Dialog
       open={entry != null}
       onOpenChange={open => !open && onClose()}
-      title={entry?.estimate === "failed" ? "填热量" : "修改这一笔"}
+      title={entry?.estimate === "failed" ? t("dl.fillKcal") : t("es.title")}
       size="sm"
       footer={
         <>
           <Button variant="secondary" onClick={onClose}>
-            取消
+            {t("common.cancel")}
           </Button>
           <Button disabled={!valid} loading={saving} onClick={() => void save()}>
-            保存
+            {t("common.save")}
           </Button>
         </>
       }
     >
       <DialogBody>
         <div className="wt:flex wt:flex-col wt:gap-3">
-          <FormField label="内容">
+          <FormField label={t("es.content")}>
             {field => (
               <Input
                 {...field}
@@ -91,7 +94,7 @@ export function EntryDialog({ entry, today, onClose }: { entry: Entry | null; to
             )}
           </FormField>
           <div className="wt:grid wt:grid-cols-2 wt:gap-3">
-            <FormField label="时间">
+            <FormField label={t("es.time")}>
               {field => (
                 <Input
                   {...field}
@@ -102,14 +105,14 @@ export function EntryDialog({ entry, today, onClose }: { entry: Entry | null; to
                 />
               )}
             </FormField>
-            <FormField label="日期">
+            <FormField label={t("es.date")}>
               {field => (
                 <DatePicker {...field} value={date} onValueChange={v => v && setDate(v)} isDateDisabled={day => day > today} />
               )}
             </FormField>
           </div>
           <div className="wt:grid wt:grid-cols-2 wt:gap-3">
-            <FormField label={entry?.kind === "move" ? "消耗（kcal）" : "热量（kcal）"}>
+            <FormField label={entry?.kind === "move" ? `${t("ql.burnLabel")}（kcal）` : `${t("mlb.kcalLabel")}（kcal）`}>
               {field => (
                 <Input
                   {...field}
@@ -121,7 +124,7 @@ export function EntryDialog({ entry, today, onClose }: { entry: Entry | null; to
               )}
             </FormField>
             {entry?.kind === "move" && (
-              <FormField label="时长（分钟）">
+              <FormField label={`${t("es.duration")}（${t("unit.minutes")}）`}>
                 {field => (
                   <Input
                     {...field}
@@ -136,12 +139,12 @@ export function EntryDialog({ entry, today, onClose }: { entry: Entry | null; to
           </div>
           <p className="wt:text-ink-3 wt:text-[12px]">
             {entry?.estimate === "pending"
-              ? "这条还在 AI 估算，保存后按你填的数字算。"
+              ? t("ed.pendingHint")
               : entry?.estimate === "failed"
-                ? "AI 没估算出来，填一个大概的数就行。"
+                ? t("es.failedHint")
                 : entry?.kind === "food"
-                  ? "改过的数字会记进常吃，下次写同样的直接用。"
-                  : "运动消耗会加回当天还能吃的热量。"}
+                  ? t("ed.foodHint")
+                  : t("es.moveHint")}
           </p>
         </div>
       </DialogBody>

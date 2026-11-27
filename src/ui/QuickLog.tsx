@@ -7,10 +7,12 @@ import { useEffect, useRef, useState } from "react";
 import { useQueryClient } from "@tanstack/react-query";
 import { Footprints, SendHorizontal, Sparkles, UtensilsCrossed } from "lucide-react";
 import { Button, IconButton, Spinner, cn, toast } from "@tau/ui";
-import { aiErrorMessage, needsSetup } from "../ai";
+import { useI18n } from "@tau/plugins";
+import { aiErrorKey, needsSetup } from "../ai";
 import { dateKey, timeKey } from "../data/model";
 import { fromMemory, type Draft } from "../data/parse";
 import { WEIGHT_KEY, useRuntime } from "../runtime";
+import { messages, type MessageKey } from "../i18n";
 import { FOOD_COLOR, MOVE_COLOR, dayLabel } from "./bits";
 import { useFoods } from "./queries";
 
@@ -34,13 +36,14 @@ export function QuickLog({
   date?: string;
 }) {
   const { data, ai, context, estimates } = useRuntime();
+  const { t } = useI18n(messages);
   const client = useQueryClient();
   const foods = useFoods();
   const [text, setText] = useState("");
   const [draft, setDraft] = useState<Draft | null>(null);
   const [kcalText, setKcalText] = useState("");
   const [estimating, setEstimating] = useState(false);
-  const [error, setError] = useState<{ message: string; setup: boolean } | null>(null);
+  const [error, setError] = useState<{ key: MessageKey; setup: boolean } | null>(null);
   const [saving, setSaving] = useState(false);
   const inputRef = useRef<HTMLInputElement>(null);
   const requestRef = useRef<AbortController | null>(null);
@@ -74,8 +77,8 @@ export function QuickLog({
         })
         .catch(err => {
           if (controller.signal.aborted) return;
-          const message = aiErrorMessage(err);
-          if (message) setError({ message, setup: needsSetup(err) });
+          const key = aiErrorKey(err);
+          if (key) setError({ key, setup: needsSetup(err) });
         })
         .finally(() => {
           if (!controller.signal.aborted) setEstimating(false);
@@ -112,13 +115,15 @@ export function QuickLog({
         await data.rememberFood(draft.text, kcal);
       if (!valid) void estimates.enqueue(entry);
       if (context.signal.aborted) return;
-      const saved = date ? `已补到 ${dayLabel(date)}：${draft.text}` : `已记下 ${draft.text}`;
-      toast.success(valid ? saved : `${saved}，热量在后台估算`);
+      const saved = date
+        ? t("ql.savedBackfill", { day: dayLabel(t, date), text: draft.text })
+        : t("ql.saved", { text: draft.text });
+      toast.success(valid ? saved : `${saved}${t("ql.pendingSuffix")}`);
       setText("");
       await client.invalidateQueries({ queryKey: WEIGHT_KEY });
       inputRef.current?.focus();
     } catch {
-      toast.error("记录失败");
+      toast.error(t("common.logFailed"));
     } finally {
       setSaving(false);
     }
@@ -144,11 +149,11 @@ export function QuickLog({
               setText("");
             }
           }}
-          placeholder={date ? "补记饮食或运动：午饭牛肉面 / 散步 30 分钟" : "吃之前先写下来：奶茶一杯 / 跑步 30 分钟"}
-          aria-label={date ? `补记 ${dayLabel(date)} 的饮食或运动` : "一句话记录饮食或运动"}
+          placeholder={date ? t("ql.placeholderBackfill") : t("ql.placeholder")}
+          aria-label={date ? t("ql.ariaBackfill", { day: dayLabel(t, date) }) : t("ql.aria")}
           className="wt:text-tau-body wt:placeholder:text-ink-3 wt:min-w-0 wt:flex-1 wt:bg-transparent wt:outline-none"
         />
-        <IconButton aria-label="记下" disabled={!canSubmit || saving} onClick={() => void submit()}>
+        <IconButton aria-label={t("common.saveEntry")} disabled={!canSubmit || saving} onClick={() => void submit()}>
           {saving ? <Spinner /> : <SendHorizontal className="wt:size-[15px]" strokeWidth={1.75} />}
         </IconButton>
       </div>
@@ -170,16 +175,22 @@ export function QuickLog({
               )}
             </span>
             <span className="wt:min-w-0 wt:flex-1 wt:truncate">
-              {isMove ? `${draft.text} · ${draft.minutes} 分钟` : draft.text}
+              {isMove ? (
+                <>
+                  {draft.text} · {t("wt.minutes", { count: draft.minutes })}
+                </>
+              ) : (
+                draft.text
+              )}
             </span>
             {estimating ? (
               <span className="wt:text-ink-3 wt:inline-flex wt:items-center wt:gap-1.5 wt:text-[11.5px]">
                 <Spinner />
-                估算中
+                {t("ql.estimating")}
               </span>
             ) : (
               <label className="wt:inline-flex wt:items-baseline wt:gap-1">
-                <span className="wt:text-ink-3">{isMove ? "消耗" : "≈"}</span>
+                <span className="wt:text-ink-3">{isMove ? t("ql.burnLabel") : "≈"}</span>
                 <input
                   value={kcalText}
                   inputMode="numeric"
@@ -191,7 +202,7 @@ export function QuickLog({
                     }
                   }}
                   placeholder="?"
-                  aria-label="热量（千卡）"
+                  aria-label={t("ql.kcalAria")}
                   className="wt:border-line-1 wt:focus:border-accent wt:w-[52px] wt:rounded-[6px] wt:border wt:bg-transparent wt:px-1.5 wt:text-right wt:font-semibold wt:tabular-nums wt:outline-none"
                 />
                 <span className="wt:text-ink-3">kcal</span>
@@ -200,10 +211,10 @@ export function QuickLog({
           </div>
           {error ? (
             <div className="wt:text-ink-2 wt:flex wt:items-center wt:gap-2 wt:text-[12px]">
-              {error.message}，可以直接填热量
+              {t("ql.errorHint", { message: t(error.key) })}
               {error.setup && (
                 <Button size="sm" variant="ghost" onClick={() => context.ai.openSettings()}>
-                  去设置
+                  {t("common.goSettings")}
                 </Button>
               )}
             </div>
@@ -212,29 +223,28 @@ export function QuickLog({
               <div className="wt:text-ink-2 wt:text-[12px]">
                 {after != null ? (
                   <>
-                    记下后{after < 0 ? "超出预算" : "还能吃"}{" "}
+                    {after < 0 ? t("ql.afterOverPrefix") : t("ql.afterLeftPrefix")}{" "}
                     <b className={cn("wt:font-semibold wt:tabular-nums", after < 0 ? "wt:text-danger" : "wt:text-ink-1")}>
                       {Math.abs(after)}
                     </b>{" "}
                     kcal
                   </>
                 ) : hasProfile ? null : (
-                  "填写身体数据后显示还能吃多少"
+                  t("ql.noProfileAfter")
                 )}
                 {!isMove && kcal > 0 && (
                   <span className="wt:text-ink-3">
-                    {" "}
-                    · 相当于散步 {Math.round(kcal / 4)} 分钟
+                    {t("ql.walkEquivalent", { minutes: Math.round(kcal / 4) })}
                   </span>
                 )}
                 {draft.source === "ai" && (
                   <span className="wt:text-ink-3 wt:inline-flex wt:items-center wt:gap-0.5">
                     {" "}
                     · <Sparkles className="wt:size-[11px]" strokeWidth={1.75} />
-                    AI 估算，可修改
+                    {t("ql.aiEstimated")}
                   </span>
                 )}
-                {draft.source === "memory" && <span className="wt:text-ink-3"> · 上次记的数</span>}
+                {draft.source === "memory" && <span className="wt:text-ink-3">{t("ql.memoryValue")}</span>}
               </div>
             )
           )}

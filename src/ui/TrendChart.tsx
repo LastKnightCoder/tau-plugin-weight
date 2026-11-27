@@ -4,7 +4,9 @@
  * 悬停时十字线贯穿两区并显示当天读数；点击选中日期，由页面展示当天流水。
  */
 import { useMemo, useState, type PointerEvent } from "react";
+import { useI18n } from "@tau/plugins";
 import type { DaySummary } from "../data/stats";
+import { messages } from "../i18n";
 import { FOOD_COLOR, MOVE_COLOR, dayLabel, kg, shortDate, signed, useWidth } from "./bits";
 
 const PAD_L = 36;
@@ -29,6 +31,7 @@ export function TrendChart({
   showPm: boolean;
   onSelectDate(date: string): void;
 }) {
+  const { t } = useI18n(messages);
   const [ref, width] = useWidth<HTMLDivElement>();
   const [hover, setHover] = useState<number | null>(null);
   const height = TOP_H + GAP + BAR_H + AXIS_H;
@@ -85,7 +88,7 @@ export function TrendChart({
   return (
     <div ref={ref} className="wt:relative wt:select-none">
       {width > 0 && (
-        <svg width={width} height={height} className="wt:block wt:overflow-visible" role="img" aria-label="体重与每日摄入趋势">
+        <svg width={width} height={height} className="wt:block wt:overflow-visible" role="img" aria-label={t("wt.chartAria")}>
           {ticks.map(v => (
             <g key={v}>
               <line x1={PAD_L} x2={width - PAD_R} y1={y(v)} y2={y(v)} stroke="var(--tau-line-2)" />
@@ -98,7 +101,7 @@ export function TrendChart({
             <g>
               <line x1={PAD_L} x2={width - PAD_R} y1={y(goal)} y2={y(goal)} stroke="var(--tau-ok)" strokeWidth={1.5} strokeDasharray="4 4" />
               <text x={width - PAD_R} y={y(goal) - 6} textAnchor="end" className="wt:fill-ok wt:text-[10.5px]">
-                目标 {goal}
+                {t("wt.legend.goal")} {goal}
               </text>
             </g>
           )}
@@ -150,7 +153,7 @@ export function TrendChart({
             <g>
               <line x1={PAD_L} x2={width - PAD_R} y1={yk(budget)} y2={yk(budget)} stroke="var(--tau-ink-2)" strokeWidth={1.2} strokeDasharray="4 4" />
               <text x={width - PAD_R} y={yk(budget) - 5} textAnchor="end" className="wt:fill-ink-2 wt:text-[10.5px]">
-                预算 {budget}
+                {t("dl.budget")} {budget}
               </text>
             </g>
           )}
@@ -195,22 +198,23 @@ export function TrendChart({
           }}
         >
           <div className="wt:text-ink-3 wt:mb-0.5 wt:text-[11px]">
-            {dayLabel(h.date)}
-            {h.date === today ? " · 记录中" : ""}
+            {dayLabel(t, h.date)}
+            {h.date === today ? t("tc.loggingSuffix") : ""}
           </div>
-          <TipRow swatch="var(--tau-ink-3)" label="晨重" value={kg(h.am)} />
-          {showPm && <TipRow swatch="transparent" ring label="睡前" value={kg(h.pm)} />}
-          <TipRow swatch="var(--tau-accent)" label="7 日均值" value={kg(h.avg, 2)} />
+          <TipRow swatch="var(--tau-ink-3)" label={t("wt.legend.am")} value={kg(h.am)} />
+          {showPm && <TipRow swatch="transparent" ring label={t("slot.pm")} value={kg(h.pm)} />}
+          <TipRow swatch="var(--tau-accent)" label={t("wt.legend.avg")} value={kg(h.avg, 2)} />
           <TipRow
             swatch={FOOD_COLOR}
-            label="摄入"
-            value={h.foodCount ? `${h.intake} kcal` : "未记"}
+            label={t("dl.intake")}
+            value={h.foodCount ? `${h.intake} kcal` : t("wd.notWeighed")}
             note={h.foodCount && h.budget ? `${signed(h.intake - h.burn - h.budget, 0)}` : undefined}
             over={h.eat === "miss"}
           />
-          <TipRow swatch={MOVE_COLOR} label="运动" value={`${h.moveMinutes} 分钟`} />
+          <TipRow swatch={MOVE_COLOR} label={t("dl.move")} value={t("wt.minutes", { count: h.moveMinutes })} />
           <div className="wt:text-accent-text wt:mt-1 wt:text-[11.5px]">
-            {h.am == null ? "没称晨重 · " : ""}点击查看当天记录
+            {h.am == null ? t("tc.noWeigh") : ""}
+            {t("tc.clickToView")}
           </div>
         </div>
       )}

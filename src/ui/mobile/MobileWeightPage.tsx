@@ -4,11 +4,12 @@
  * 第一次打开先走引导；离开期间后台估算完成的条目在回来时高亮。
  */
 import { useEffect, useMemo, useRef, useState } from "react";
-import type { PluginPageProps } from "@tau/plugins";
+import { useI18n, type PluginPageProps } from "@tau/plugins";
 import { Loading } from "@tau/ui";
 import { compareGroups } from "../../data/stats";
 import { dateKey, timeKey, type Entry, type WeighSlot } from "../../data/model";
 import { useRuntime } from "../../runtime";
+import { messages } from "../../i18n";
 import { useLedger, useNow, usePrefs } from "../queries";
 import { defaultWeigh } from "../weighing";
 import { useQueryClient } from "@tanstack/react-query";
@@ -27,6 +28,7 @@ const HIGHLIGHT_MS = 2400;
 
 export function MobileWeightPage({ params, pageContext }: PluginPageProps) {
   const runtime = useRuntime();
+  const { t } = useI18n(messages);
   const { pages, estimates } = runtime;
   const client = useQueryClient();
   const { today, time } = useNow();
@@ -91,10 +93,10 @@ export function MobileWeightPage({ params, pageContext }: PluginPageProps) {
   }, [query.data]);
 
   if (query.isError)
-    return <div className="wt:text-ink-3 wt:grid wt:h-60 wt:place-items-center wt:text-[13px]">记录读取失败</div>;
+    return <div className="wt:text-ink-3 wt:grid wt:h-60 wt:place-items-center wt:text-[13px]">{t("common.loadFailed")}</div>;
   if (!query.data || !prefs.data) return <Loading minHeight={240} />;
   const { ledger, overview: o, todayEntries, profile } = query.data;
-  const t = o.today;
+  const day = o.today;
   const moveGoal = profile?.moveGoal ?? 30;
   const groups = compareGroups(ledger.days);
 
@@ -115,7 +117,7 @@ export function MobileWeightPage({ params, pageContext }: PluginPageProps) {
       </SheetHost.Provider>
     );
 
-  const remaining = t.budget > 0 ? t.remaining : null;
+  const remaining = day.budget > 0 ? day.remaining : null;
   return (
     <SheetHost.Provider value={pageContext}>
       {/* 宿主外壳随键盘收缩：内容区滚动，记录条贴在可见区底部 */}
@@ -132,12 +134,12 @@ export function MobileWeightPage({ params, pageContext }: PluginPageProps) {
           <TodayList
             entries={todayEntries}
             remaining={remaining}
-            moveMinutes={t.moveMinutes}
+            moveMinutes={day.moveMinutes}
             moveGoal={moveGoal}
             time={time}
             highlight={highlight}
             onEdit={setEditing}
-            onDelete={entry => void removeWithUndo(runtime, client, entry)}
+            onDelete={entry => void removeWithUndo(runtime, client, entry, t)}
             onFill={text => logRef.current?.fill(text)}
           />
         </div>
@@ -145,13 +147,13 @@ export function MobileWeightPage({ params, pageContext }: PluginPageProps) {
           <LogBar
             ref={logRef}
             remaining={remaining}
-            eaten={t.intake}
+            eaten={day.intake}
             onVoice={text =>
               setVoice({
                 text,
                 now: timeKey(new Date()),
                 remaining,
-                moveMinutes: t.moveMinutes,
+                moveMinutes: day.moveMinutes,
                 moveGoal,
                 kg: o.latestAvg,
               })

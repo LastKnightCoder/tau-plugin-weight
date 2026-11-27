@@ -1,10 +1,14 @@
 /**
  * 打卡格（最近 8 周，周一开头，每天两颗点 = 少吃 / 多动，点格选择当天）与「做到了，第二天轻多少」四组对比。
  */
+import { useI18n } from "@tau/plugins";
 import { Tooltip, cn } from "@tau/ui";
 import { addDays } from "../data/model";
 import { compareGroups, type DaySummary, type GroupStat, type Ledger } from "../data/stats";
-import { Card, CardHead, Delta, Dot, FOOD_COLOR, GAIN_COLOR, LOSE_COLOR, MOVE_COLOR, dayLabel, shortDate } from "./bits";
+import { messages, type Translate } from "../i18n";
+
+const GROUP_KEYS = { both: "ig.groupBoth", eat: "ig.groupEat", move: "ig.groupMove", none: "ig.groupNone" } as const;
+import { Card, CardHead, Delta, Dot, FOOD_COLOR, GAIN_COLOR, LOSE_COLOR, MOVE_COLOR, WEEKDAYS, dayLabel, shortDate } from "./bits";
 
 const WEEKS = 8;
 const MIN_SAMPLE = 5;
@@ -17,18 +21,19 @@ export function HabitGrid({ ledger, today, selectedDate, budgetKnown, moveGoal, 
   moveGoal: number;
   onSelectDate(date: string): void;
 }) {
+  const { t } = useI18n(messages);
   const weekday = (new Date(`${today}T00:00:00`).getDay() + 6) % 7;
   const firstMonday = addDays(today, -weekday - (WEEKS - 1) * 7);
   const rows = Array.from({ length: WEEKS }, (_, w) => addDays(firstMonday, w * 7));
   return (
     <Card>
-      <CardHead title="打卡" note="由记录自动判定 · 点一天看记录" />
+      <CardHead title={t("ig.title")} note={`${t("ig.autoNote")} · ${t("ig.noteDesktop")}`} />
       <div className="wt:px-[18px] wt:pt-2.5 wt:pb-4">
         <div className="wt:grid wt:grid-cols-[48px_repeat(7,minmax(0,1fr))] wt:items-center wt:gap-1">
           <span />
-          {"一二三四五六日".split("").map(c => (
-            <span key={c} className="wt:text-ink-3 wt:text-center wt:text-[10.5px]">
-              {c}
+          {WEEKDAYS.map(w => (
+            <span key={w} className="wt:text-ink-3 wt:text-center wt:text-[10.5px]">
+              {t(w)}
             </span>
           ))}
           {rows.map(monday => (
@@ -45,15 +50,15 @@ export function HabitGrid({ ledger, today, selectedDate, budgetKnown, moveGoal, 
         <div className="wt:text-ink-3 wt:mt-2.5 wt:flex wt:flex-wrap wt:gap-x-3 wt:gap-y-1 wt:text-[11px]">
           <span className="wt:inline-flex wt:items-center wt:gap-1.5">
             <Dot color={FOOD_COLOR} />
-            少吃 · 没超预算{budgetKnown ? "" : "（填写身体数据后判定）"}
+            {t("ig.eatOk")}{budgetKnown ? "" : t("ig.needsProfile")}
           </span>
           <span className="wt:inline-flex wt:items-center wt:gap-1.5">
             <Dot color={MOVE_COLOR} />
-            多动 · 运动 ≥ {moveGoal} 分钟
+            {t("ig.moveLegend", { goal: moveGoal })}
           </span>
           <span className="wt:inline-flex wt:items-center wt:gap-1.5">
             <Dot color="" filled={false} />
-            没做到或没记
+            {t("ig.noneLegend")}
           </span>
         </div>
       </div>
@@ -91,18 +96,21 @@ function Week({ monday, ledger, today, selectedDate, onSelectDate }: {
 }
 
 function Cell({ day, isToday, selected, onSelect }: { day: DaySummary; isToday: boolean; selected: boolean; onSelect(): void }) {
-  const eatText = day.eat === "ok" ? "没超预算" : day.eat === "miss" ? `超出 ${-day.remaining} kcal` : day.foodCount ? "还在记" : "饮食没记";
+  const { t } = useI18n(messages);
+  const eatText =
+    day.eat === "ok" ? t("wt.legend.under") : day.eat === "miss" ? t("ig.cellOver", { kcal: -day.remaining }) : day.foodCount ? t("ig.cellLogging") : t("ig.cellNotLogged");
+  const moveText = t("ig.cellMove", { minutes: day.moveMinutes });
   return (
     <Tooltip
       content={
         <span className="wt:text-[12px]">
-          {dayLabel(day.date)} · {eatText} · 运动 {day.moveMinutes} 分钟
+          {dayLabel(t, day.date)} · {eatText} · {moveText}
         </span>
       }
     >
       <button
         type="button"
-        aria-label={`${dayLabel(day.date)}，${eatText}，运动 ${day.moveMinutes} 分钟`}
+        aria-label={t("ig.cellAria", { day: dayLabel(t, day.date), eat: eatText, move: moveText })}
         aria-pressed={selected}
         onClick={onSelect}
         className={cn(
@@ -119,22 +127,24 @@ function Cell({ day, isToday, selected, onSelect }: { day: DaySummary; isToday: 
 }
 
 export function GroupCompare({ days }: { days: readonly DaySummary[] }) {
+  const { t } = useI18n(messages);
   const groups = compareGroups(days);
   const max = Math.max(0.2, ...groups.map(g => Math.abs(g.mean ?? 0)));
   return (
     <Card>
-      <CardHead title="做到了，第二天轻多少" />
+      <CardHead title={t("ig.title2")} />
       <div className="wt:flex wt:flex-col wt:gap-1 wt:px-3.5 wt:pt-2.5 wt:pb-3.5">
         {groups.map(g => (
           <GroupRow key={g.id} group={g} max={max} />
         ))}
-        <p className="wt:text-ink-2 wt:px-1.5 wt:pt-1.5 wt:text-[12px] wt:leading-[1.7]">{conclusion(groups)}</p>
+        <p className="wt:text-ink-2 wt:px-1.5 wt:pt-1.5 wt:text-[12px] wt:leading-[1.7]">{conclusion(t, groups)}</p>
       </div>
     </Card>
   );
 }
 
 function GroupRow({ group, max }: { group: GroupStat; max: number }) {
+  const { t } = useI18n(messages);
   const v = group.mean ?? 0;
   const weak = group.days < MIN_SAMPLE;
   // 0 轴放在 62% 处：变轻是主要方向，左侧留得更长
@@ -144,7 +154,7 @@ function GroupRow({ group, max }: { group: GroupStat; max: number }) {
       <span className="wt:flex wt:items-center wt:gap-1 wt:text-[12.5px]">
         <Dot color={FOOD_COLOR} filled={group.id === "both" || group.id === "eat"} />
         <Dot color={MOVE_COLOR} filled={group.id === "both" || group.id === "move"} />
-        <span className="wt:ml-1">{group.name}</span>
+        <span className="wt:ml-1">{t(GROUP_KEYS[group.id])}</span>
       </span>
       <div className="wt:relative wt:h-3">
         <div className="wt:bg-line-1 wt:absolute wt:-top-2 wt:-bottom-2 wt:left-[62%] wt:w-px" />
@@ -163,25 +173,25 @@ function GroupRow({ group, max }: { group: GroupStat; max: number }) {
       <span className="wt:text-right wt:text-[12.5px]">
         <Delta value={group.mean} digits={2} suffix=" kg" />
         <small className="wt:text-ink-3 wt:block wt:text-[10.5px] wt:leading-none">
-          {weak && group.days > 0 ? "样本少 · " : ""}
-          {group.days} 天
+          {weak && group.days > 0 ? t("ig.samples") : ""}
+          {t("common.days", { count: group.days })}
         </small>
       </span>
     </div>
   );
 }
 
-function conclusion(groups: GroupStat[]): string {
+function conclusion(t: Translate, groups: GroupStat[]): string {
   const [both, eat, move, none] = groups;
   const enough = (g: GroupStat) => g.days >= MIN_SAMPLE && g.mean != null;
-  if (!groups.some(enough)) return "次日晨重减当日晨重的平均值。坚持记录两三周，这里就能看出少吃和多动各自的效果。";
+  if (!groups.some(enough)) return t("ig.conclusion.empty");
   const parts: string[] = [];
   if (enough(eat) && enough(move))
-    parts.push(eat.mean! < move.mean! ? "对你来说少吃比多动管用" : "对你来说多动比少吃管用");
-  else if (enough(eat)) parts.push("少吃是主力");
-  else if (enough(move)) parts.push("多动是主力");
+    parts.push(eat.mean! < move.mean! ? t("ig.conclusion.eatVsMove1") : t("ig.conclusion.eatVsMove2"));
+  else if (enough(eat)) parts.push(t("ig.conclusion.eatMain"));
+  else if (enough(move)) parts.push(t("ig.conclusion.moveMain"));
   if (enough(both) && groups.filter(enough).every(g => g === both || both.mean! <= g.mean!))
-    parts.push("两样都做到效果最好");
-  if (enough(none) && none.mean! > 0) parts.push("都没做的日子第二天会涨");
-  return `次日晨重减当日晨重的平均值。${parts.join("，") || "目前各组差别不大"}。`;
+    parts.push(t("ig.conclusion.bothBest"));
+  if (enough(none) && none.mean! > 0) parts.push(t("ig.conclusion.noneGains"));
+  return `${t("ig.conclusion.prefix")}${parts.join(t("ig.joiner")) || t("ig.conclusion.tail")}${t("ig.period")}`;
 }
