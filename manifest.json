@@ -4,17 +4,30 @@
   "description": "记录早晚体重、吃了什么和运动，随时看到今天还能吃多少，用图表和 AI 看清少吃多动的效果。手机上可以按住说话一次记好几样。",
   "categories": ["page"],
   "keywords": ["减肥", "减重", "体重", "热量", "卡路里", "运动"],
+  "locales": ["zh-CN", "zh-TW", "en-US"],
+  "i18n": {
+    "zh-TW": {
+      "name": "減重",
+      "description": "記錄早晚體重、吃了什麼和運動，隨時看到今天還能吃多少，用圖表和 AI 看清少吃多動的效果。手機上可以按住說話一次記好幾樣。",
+      "keywords": ["減肥", "減重", "體重", "熱量", "卡路里", "運動"]
+    },
+    "en-US": {
+      "name": "Weight Tracker",
+      "description": "Log morning and evening weight, meals, and workouts to see your remaining calorie budget for today, with charts and AI insights. On mobile, hold to speak and log multiple entries at once.",
+      "keywords": ["weight loss", "weight", "calories", "diet", "workout", "fitness"]
+    }
+  },
   "permissions": ["ai:chat", "speech:input"],
-  "version": "0.2.11",
+  "version": "0.2.12",
   "targets": {
     "desktop": {
-      "minAppVersion": "0.60.7"
+      "minAppVersion": "0.68.0"
     },
     "android": {
-      "minAppVersion": "0.2.16"
+      "minAppVersion": "0.6.0"
     },
     "ios": {
-      "minAppVersion": "0.2.16"
+      "minAppVersion": "0.6.0"
     }
   }
 }
