@@ -20,7 +20,13 @@ vi.mock("@tau/plugins", () => {
     }),
     useI18n: () => ({
       locale: "zh-CN",
-      t: (key: string) => table[key] ?? key,
+      t: (key: string, values?: Record<string, string | number | boolean>) =>
+        (table[key] ?? key).replace(/\{\{(\w+)\}\}/g, (_match, name: string) => {
+          const value = values?.[name];
+          if (value == null || (typeof value === "number" && !Number.isFinite(value)))
+            throw new Error(`无效的翻译参数：${key}.${name}`);
+          return String(value);
+        }),
       resolve: (value: unknown) => String(value),
     }),
   };

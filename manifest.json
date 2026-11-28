@@ -18,7 +18,7 @@
     }
   },
   "permissions": ["ai:chat", "speech:input"],
-  "version": "0.2.13",
+  "version": "0.2.14",
   "targets": {
     "desktop": {
       "minAppVersion": "0.68.0"

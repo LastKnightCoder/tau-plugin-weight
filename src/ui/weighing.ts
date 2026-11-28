@@ -68,7 +68,7 @@ export function pillText(t: Translate, date: string, today: string): string {
 /** 保存按钮：今天「记下」，其他日子写明记到哪天；已有读数为「更新」 */
 export function saveLabel(t: Translate, date: string, today: string, slot: WeighSlot, existing: boolean): string {
   if (existing) return t("wd.update");
-  if (date === today) return t("common.saveEntry");
+  if (!date || date === today) return t("common.saveEntry");
   if (date === addDays(today, -1)) return t("wd.savedYesterday", { slot: t(SLOT_KEYS[slot]) });
   const [, m, d] = date.split("-").map(Number);
   return t("wd.backfillSlot", { month: m, day: d, slot: t(SLOT_KEYS[slot]) });
